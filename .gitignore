@@ -3,3 +3,9 @@ client/node_modules/
 client/build/
 .env
 *.log
+.DS_Store
+Thumbs.db
+.vscode/
+.kiro/
+package-lock.json
+client/package-lock.json
