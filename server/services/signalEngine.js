@@ -143,8 +143,13 @@ class SignalEngine {
 
     let score = 0;
     let explanation = '';
-    const range = maxCallStrike - maxPutStrike;
     const midPoint = (maxCallStrike + maxPutStrike) / 2;
+
+    // Guard: If OI data is invalid or support > resistance, skip scoring
+    if (maxPutStrike === 0 || maxCallStrike === 0 || maxPutStrike >= maxCallStrike) {
+      explanation = `OI Support/Resistance levels unclear. Put OI max: ${maxPutStrike}, Call OI max: ${maxCallStrike}. Cannot determine range.`;
+      return { rule: 'OI Support/Resistance', score: 0, explanation, value: `Support: ${maxPutStrike} | Resistance: ${maxCallStrike}` };
+    }
 
     if (spotPrice <= maxPutStrike * 1.005) {
       score = 2;
@@ -255,12 +260,14 @@ class SignalEngine {
     }
 
     // IV Skew: If Put IV >> Call IV, market is hedging = expecting fall
-    if (atmPutIV > atmCallIV * 1.15) {
-      score -= 1;
-      explanation += ` IV SKEW: Put IV (${atmPutIV.toFixed(1)}) > Call IV (${atmCallIV.toFixed(1)}). Market paying more for downside protection = bearish undercurrent.`;
-    } else if (atmCallIV > atmPutIV * 1.15) {
-      score += 1;
-      explanation += ` IV SKEW: Call IV (${atmCallIV.toFixed(1)}) > Put IV (${atmPutIV.toFixed(1)}). Market paying more for upside = bullish undercurrent.`;
+    if (atmCallIV > 0 && atmPutIV > 0) {
+      if (atmPutIV > atmCallIV * 1.15) {
+        score -= 1;
+        explanation += ` IV SKEW: Put IV (${atmPutIV.toFixed(1)}) > Call IV (${atmCallIV.toFixed(1)}). Market paying more for downside protection = bearish undercurrent.`;
+      } else if (atmCallIV > atmPutIV * 1.15) {
+        score += 1;
+        explanation += ` IV SKEW: Call IV (${atmCallIV.toFixed(1)}) > Put IV (${atmPutIV.toFixed(1)}). Market paying more for upside = bullish undercurrent.`;
+      }
     }
 
     return { rule: 'IV Analysis', score, explanation, value: `ATM IV: ${avgIV.toFixed(1)}%` };

@@ -21,7 +21,11 @@ app.use('/api/learning', learningRoutes);
 const buildPath = path.join(__dirname, '../client/build');
 if (fs.existsSync(buildPath)) {
   app.use(express.static(buildPath));
+  // Only serve index.html for non-API routes (SPA fallback)
   app.get('*', (req, res) => {
+    if (req.path.startsWith('/api/')) {
+      return res.status(404).json({ error: 'API endpoint not found' });
+    }
     res.sendFile(path.join(buildPath, 'index.html'));
   });
 }

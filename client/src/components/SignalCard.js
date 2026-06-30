@@ -1,8 +1,10 @@
 import React from 'react';
 
 function SignalCard({ signal }) {
+  const isLean = signal.signal?.includes('LEAN');
   const dirClass = signal.direction === 'BULLISH' ? 'bullish' : signal.direction === 'BEARISH' ? 'bearish' : 'neutral';
-  const maxScore = 14; // Max possible absolute score
+  const scoreBarClass = signal.totalScore > 0 ? 'bullish' : signal.totalScore < 0 ? 'bearish' : 'neutral';
+  const maxScore = 10; // Max possible absolute score (2+1+2+2+1+1+1)
   const scorePercent = Math.min(Math.abs(signal.totalScore) / maxScore * 100, 100);
 
   return (
@@ -18,11 +20,11 @@ function SignalCard({ signal }) {
           <span style={{color: '#8b949e', fontSize: '0.85rem'}}>Score:</span>
           <div className="score-bar">
             <div 
-              className={`score-fill ${dirClass}`}
+              className={`score-fill ${scoreBarClass}`}
               style={{width: `${scorePercent}%`}}
             ></div>
           </div>
-          <span className="score-value" style={{color: dirClass === 'bullish' ? '#3fb950' : dirClass === 'bearish' ? '#f85149' : '#8b949e'}}>
+          <span className="score-value" style={{color: signal.totalScore > 0 ? '#3fb950' : signal.totalScore < 0 ? '#f85149' : '#8b949e'}}>
             {signal.totalScore > 0 ? '+' : ''}{signal.totalScore} / ±{signal.threshold}
           </span>
         </div>

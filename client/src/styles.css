@@ -162,6 +162,7 @@ body {
 
 .score-fill.bullish { background: #3fb950; }
 .score-fill.bearish { background: #f85149; }
+.score-fill.neutral { background: #f0883e; }
 
 .score-value {
   font-weight: 700;
