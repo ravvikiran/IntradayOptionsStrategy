@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import SignalCard from '../components/SignalCard';
 
-const SYMBOLS = ['NIFTY', 'BANKNIFTY', 'RELIANCE', 'TCS', 'HDFCBANK', 'INFY', 'ICICIBANK'];
+const SYMBOLS = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY'];
 
 function Dashboard() {
   const [selectedSymbol, setSelectedSymbol] = useState('NIFTY');
@@ -49,6 +49,9 @@ function Dashboard() {
           </button>
         ))}
       </div>
+      <p style={{fontSize: '0.8rem', color: '#8b949e', marginBottom: '1rem'}}>
+        💡 Signals for NSE index options. Score ≥ ±3 triggers a signal. Score ≥ ±5 = HIGH confidence.
+      </p>
 
       <button
         className="symbol-btn"

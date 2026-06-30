@@ -48,16 +48,16 @@ Each rule analyzes one aspect of the options market and gives a score:
 - Negative score = Bearish evidence
 - Zero = Neutral/no opinion
 
-SIGNAL TRIGGERS when total score crosses ±5:
-- Score ≥ +5 → BUY CE (CALL) signal
-- Score ≤ -5 → BUY PE (PUT) signal
-- Score between -5 and +5 → NO SIGNAL (stay out)
+SIGNAL TRIGGERS when total score crosses ±3:
+- Score ≥ +3 → BUY CE (CALL) signal
+- Score ≤ -3 → BUY PE (PUT) signal
+- Score between -3 and +3 → NO SIGNAL (stay out)
 
-WHY ±5? This means at least 3-4 rules must agree. Single-rule signals are unreliable. We want CONFLUENCE - multiple independent indicators pointing the same direction.
+WHY ±3? This means at least 2 strong rules must agree. Single-rule signals are unreliable. We want CONFLUENCE - multiple independent indicators pointing the same direction.
 
 CONFIDENCE LEVELS:
-- Score ±5 to ±6 = MEDIUM confidence (trade with smaller size)
-- Score ±7 or more = HIGH confidence (full position size allowed)`
+- Score ±3 to ±4 = MEDIUM confidence (trade with smaller size)
+- Score ±5 or more = HIGH confidence (full position size allowed)`
         }
       ]
     }
@@ -375,8 +375,8 @@ TIMING: This signal is most powerful between 10:00 AM - 11:30 AM. Early morning 
 ✅ 1. Market is open (9:15 AM - 3:30 PM IST)
 ✅ 2. VIX is below 20 (if above, reduce size by 50%)
 ✅ 3. No major event in next 2 hours (RBI, budget, earnings)
-✅ 4. Signal confidence is MEDIUM or HIGH (score ≥ 5)
-✅ 5. At least 3 rules are agreeing in the same direction
+✅ 4. Signal confidence is MEDIUM or HIGH (score ≥ 3)
+✅ 5. At least 2 rules are agreeing in the same direction
 ✅ 6. IV is not abnormally high (check IV warning in signal)
 ✅ 7. You have clear stop-loss level BEFORE entering
 ✅ 8. Position size is within 2% risk rule

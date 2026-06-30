@@ -59,13 +59,15 @@ Then open http://localhost:5000 in your browser.
 
 ### Important Notes
 
-1. **NSE Data**: The app fetches data directly from NSE India website. This works during market hours (9:15 AM - 3:30 PM IST, Mon-Fri). Outside market hours, you may get stale data or errors.
+1. **NSE Data**: The app fetches live data from NSE India using the `stock-nse-india` package. This works during market hours (9:15 AM - 3:30 PM IST, Mon-Fri). Outside market hours, you'll get the last available data.
 
-2. **Rate Limiting**: NSE has rate limits. Don't refresh too frequently (wait at least 30 seconds between refreshes).
+2. **Rate Limiting**: Don't refresh too frequently (wait at least 10 seconds between refreshes). NSE has rate limits.
 
-3. **Data Delay**: NSE free data has a ~3-5 minute delay. This is fine for learning and positional trades but be aware for intraday.
+3. **Data Delay**: Free NSE data has a ~3-5 minute delay. Fine for learning and positional trades.
 
-4. **Not Financial Advice**: This is a learning tool. Always do your own analysis before trading.
+4. **Stock Options**: NIFTY and BANKNIFTY are the most reliable. Stock options (RELIANCE, TCS, etc.) may have limited availability due to NSE data restrictions.
+
+5. **Not Financial Advice**: This is a learning tool. Always do your own analysis before trading.
 
 ## Quick Start Guide
 

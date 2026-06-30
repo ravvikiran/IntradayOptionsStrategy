@@ -18,7 +18,8 @@
 
 class SignalEngine {
   constructor() {
-    this.SIGNAL_THRESHOLD = 5; // Minimum score to trigger signal
+    this.SIGNAL_THRESHOLD = 3; // Minimum score to trigger signal
+    this.HIGH_CONFIDENCE_THRESHOLD = 5; // Score for HIGH confidence
     this.rules = [];
   }
 
@@ -454,13 +455,31 @@ class SignalEngine {
     if (totalScore >= this.SIGNAL_THRESHOLD) {
       signal = 'BUY CE (CALL)';
       direction = 'BULLISH';
-      confidence = totalScore >= 7 ? 'HIGH' : 'MEDIUM';
+      if (totalScore >= this.HIGH_CONFIDENCE_THRESHOLD) {
+        confidence = 'HIGH';
+      } else {
+        confidence = 'MEDIUM';
+      }
       tradeType = 'Long Call';
     } else if (totalScore <= -this.SIGNAL_THRESHOLD) {
       signal = 'BUY PE (PUT)';
       direction = 'BEARISH';
-      confidence = totalScore <= -7 ? 'HIGH' : 'MEDIUM';
+      if (totalScore <= -this.HIGH_CONFIDENCE_THRESHOLD) {
+        confidence = 'HIGH';
+      } else {
+        confidence = 'MEDIUM';
+      }
       tradeType = 'Long Put';
+    } else if (totalScore >= 1) {
+      signal = 'LEAN BULLISH (No trade - watch)';
+      direction = 'NEUTRAL';
+      confidence = 'LOW';
+      tradeType = '';
+    } else if (totalScore <= -1) {
+      signal = 'LEAN BEARISH (No trade - watch)';
+      direction = 'NEUTRAL';
+      confidence = 'LOW';
+      tradeType = '';
     }
 
     // Get strike recommendations
