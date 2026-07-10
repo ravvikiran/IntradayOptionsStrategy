@@ -58,6 +58,37 @@ WHY ±3? This means at least 2 strong rules must agree. Single-rule signals are 
 CONFIDENCE LEVELS:
 - Score ±3 to ±4 = MEDIUM confidence (trade with smaller size)
 - Score ±5 or more = HIGH confidence (full position size allowed)`
+        },
+        {
+          title: '📘 WORKED EXAMPLE: Reading a Signal',
+          body: `Let's say the app generates this signal for NIFTY at 11:00 AM:
+
+┌─────────────────────────────────────────────┐
+│ NIFTY 24,000 | BUY CE (CALL) | Score: +5   │
+├─────────────────────────────────────────────┤
+│ PCR Analysis:          +2 (PCR = 1.4)       │
+│ OI Support/Resistance: +2 (At put support)  │
+│ Change in OI:          +2 (Put OI rising)   │
+│ Max Pain:              +1 (Below max pain)  │
+│ IV Analysis:            0 (Normal IV)       │
+│ VIX Analysis:          -1 (VIX rising)      │
+│ Volume-OI Divergence:  -1 (Mixed)           │
+└─────────────────────────────────────────────┘
+
+HOW TO READ THIS:
+• Total score = +2+2+2+1+0-1-1 = +5 → Crosses threshold (+3) → Signal fires
+• 4 rules are bullish, 2 rules are bearish, 1 neutral
+• Confidence: HIGH (score ≥ 5)
+
+WHAT TO DO:
+1. Check pre-trade checklist (VIX <20? ✅ No event? ✅)
+2. Buy NIFTY 24,000 CE or 24,050 CE (ATM)
+3. Set SL: 30% of premium paid (or if Nifty breaks below 23,900)
+4. Target: 24,200 (next call OI resistance)
+5. Exit by 3:15 PM if intraday
+
+WHAT ABOUT THE BEARISH RULES (-1, -1)?
+They exist but are outnumbered. The engine accepts that not ALL rules will agree. That's normal. The threshold ensures enough agreement exists.`
         }
       ]
     }
@@ -103,6 +134,38 @@ IMPORTANT: PCR alone is not a signal. It's one input to the scoring system. A hi
 - PCR 0.7-1.3 → 0 (No score, neutral)
 
 The engine checks PCR across all strikes. A sudden shift in PCR during the day (from 1.2 to 0.8) is a powerful reversal signal, as it means put writers are closing and call writers are entering.`
+        },
+        {
+          title: '📘 WORKED EXAMPLE: PCR Shift',
+          body: `SCENARIO: Thursday (expiry day), 10:30 AM
+
+NIFTY at 23,500. You check the signal app:
+• PCR at 9:30 AM: 1.35 (heavily put-written = bullish)
+• PCR at 10:30 AM: 0.85 (shifted to neutral/bearish)
+
+WHAT HAPPENED?
+Put writers who had sold puts at 23,400 and 23,500 are CLOSING their positions (buying back puts). Simultaneously, new call writers are entering at 23,600 and 23,700.
+
+┌──────────────────────────────────────┐
+│  PCR Timeline on Expiry Day          │
+│                                      │
+│  9:15 AM  ████████████ 1.35 Bullish  │
+│  9:45 AM  █████████░░░ 1.20 Bullish  │
+│  10:15 AM ██████░░░░░░ 1.00 Neutral  │
+│  10:30 AM ████░░░░░░░░ 0.85 Bearish  │
+│           ↑ SHIFT! Writers flipping  │
+└──────────────────────────────────────┘
+
+SIGNAL INTERPRETATION:
+• PCR dropping from 1.35 → 0.85 = put writers are SCARED
+• They no longer believe 23,500 will hold as support
+• Call writers entering = they believe upside is capped
+• Combined = BEARISH shift
+
+TRADE: BUY PE 23,500 at ~₹120
+RESULT (hypothetical): Nifty fell to 23,350 by 2 PM. PE went to ₹200. Profit: 66%
+
+NOTE: PCR alone didn't trigger this signal. The engine would also check OI unwinding (Rule 4), Volume-OI divergence (Rule 7), etc. The score from PCR (-2) plus other confirming rules pushed total past threshold.`
         }
       ]
     }
@@ -159,6 +222,43 @@ The signal engine identifies:
 - Highest PUT OI strike = Strongest support
 - Highest CALL OI strike = Strongest resistance
 - Position of spot relative to these = Directional bias`
+        },
+        {
+          title: '📘 WORKED EXAMPLE: OI Levels in Action',
+          body: `SCENARIO: Wednesday, 11:00 AM. NIFTY at 24,050.
+
+Option Chain Data (simplified):
+┌──────────┬──────────────┬──────────────┐
+│ Strike   │ Call OI (Lk) │ Put OI (Lk)  │
+├──────────┼──────────────┼──────────────┤
+│ 23,800   │    45        │    120 ★★    │
+│ 23,900   │    60        │    95        │
+│ 24,000   │    80        │    150 ★★★  │ ← Highest Put OI = SUPPORT
+│ 24,100   │    110       │    70        │
+│ 24,200   │    180 ★★★  │    40        │ ← Highest Call OI = RESISTANCE
+│ 24,300   │    95        │    25        │
+└──────────┴──────────────┴──────────────┘
+
+READING THIS:
+• Support = 24,000 (Put OI: 1.5 crore contracts sold here)
+  → Writers collected premium betting Nifty WON'T fall below 24,000
+  → They have ₹100s of crores in margin blocked to defend this
+
+• Resistance = 24,200 (Call OI: 1.8 crore contracts sold here)
+  → Writers collected premium betting Nifty WON'T cross 24,200
+  → They will sell Nifty futures if it approaches 24,200 to push it down
+
+• Spot (24,050) is in LOWER HALF of range (24,000 to 24,200)
+  → Score: +1 (closer to support = mild bullish lean)
+
+NEXT DAY (Thursday):
+If you see 24,000 Put OI DROP from 150L to 80L → Put writers are EXITING
+→ They no longer believe 24,000 will hold
+→ Support is BREAKING
+→ Score for this rule flips from +1 to -1 or -2
+→ Expect fall below 24,000
+
+THIS is why Change in OI (Rule 4) works alongside OI S/R (Rule 3).`
         }
       ]
     }
@@ -211,6 +311,46 @@ If Call IV > Put IV by significant margin:
 → BULLISH undercurrent
 
 The signal engine checks: If ATM Put IV > ATM Call IV by >15%, it adds -1 (bearish). Vice versa for bullish. This is a subtle but powerful signal that most retail traders completely ignore.`
+        },
+        {
+          title: '📘 WORKED EXAMPLE: IV Crush Loss',
+          body: `SCENARIO: RBI Policy Day (Tuesday)
+
+BEFORE RBI ANNOUNCEMENT (Monday 3:30 PM):
+• Nifty: 23,800
+• ATM IV (23,800 CE): 22% (normally 12-14%)
+• 23,800 CE price: ₹280 (inflated due to high IV)
+
+YOU BUY: 23,800 CE at ₹280, thinking "RBI will cut rates = bullish"
+
+AFTER RBI ANNOUNCEMENT (Tuesday 10:30 AM):
+• RBI cuts rates (you were RIGHT about direction!)
+• Nifty moves UP to 23,900 (+100 points in your favor)
+• ATM IV drops from 22% → 13% (IV CRUSH after event)
+• Your 23,800 CE is now worth... ₹240 (LOSS of ₹40!)
+
+┌─────────────────────────────────────────────┐
+│  Your P&L Breakdown:                        │
+│                                             │
+│  Gain from direction (100pt move):  +₹60    │
+│  Loss from IV crush (22%→13%):     -₹100    │
+│  Net P&L:                          -₹40     │
+│                                             │
+│  You were RIGHT on direction.               │
+│  You still LOST money.                      │
+│  This is IV crush.                          │
+└─────────────────────────────────────────────┘
+
+HOW THE ENGINE PROTECTS YOU:
+When IV > 20%, the engine flags: "⚠️ HIGH IV environment"
+It doesn't add directional score but WARNS you.
+The pre-trade checklist says: "If IV warning present, reduce size or skip."
+
+CORRECT APPROACH:
+• Don't buy options before RBI/Budget/Election
+• Wait for IV to normalize AFTER the event
+• Enter the next day when IV is back to 12-14%
+• Or use spreads (buy + sell) to neutralize IV risk`
         }
       ]
     }
@@ -255,6 +395,42 @@ The signal engine gives ±1 score for max pain. It's a supporting indicator, not
 3. Very high VIX days (>20) - market moves too fast for max pain gravity
 
 NEVER trade max pain alone. Use it as confirmation with other signals. The scoring system ensures max pain is just one voice in the chorus.`
+        },
+        {
+          title: '📘 WORKED EXAMPLE: Max Pain on Expiry Day',
+          body: `SCENARIO: Thursday (Weekly Expiry), 12:00 PM
+
+• Nifty spot: 24,250
+• Max Pain (calculated from OI): 24,100
+• Spot is 150 points ABOVE max pain (0.62% above)
+
+┌─────────────────────────────────────────────┐
+│  Max Pain Visualization                     │
+│                                             │
+│  23,900  24,000  24,100  24,200  24,250     │
+│    │       │      ▲│       │       ●        │
+│    │       │  Max Pain     │    Spot Price   │
+│    │       │       │       │       │        │
+│    ←─── If spot was here, option buyers     │
+│          lose MAXIMUM money                 │
+│                                             │
+│  Spot is 150pts above → Bearish pull ↓      │
+│  Score: -1 (spot > max pain by > 0.3%)      │
+└─────────────────────────────────────────────┘
+
+WHY THIS WORKS:
+• At 24,100, Call buyers with strikes 24,200+ lose (calls expire worthless)
+• At 24,100, Put buyers with strikes 24,000- lose (puts expire worthless)
+• Market makers who SOLD these options WANT price at 24,100
+• They will actively sell Nifty to push it from 24,250 → 24,100
+
+RESULT (hypothetical):
+• 12:00 PM: Nifty at 24,250
+• 1:30 PM: Nifty at 24,180 (pullback started)
+• 3:15 PM: Nifty at 24,120 (gravitating toward max pain)
+• 3:30 PM: Expiry at 24,110 (within 10pts of max pain!)
+
+IMPORTANT: This was ONE rule adding -1 to the score. The engine only takes a trade if 2+ other rules also agree (bearish OI, bearish PCR, etc.). Max pain alone = watch, don't trade.`
         }
       ]
     }
@@ -305,6 +481,44 @@ VIX stable → No volatility edge
 
 PRO TIP: If Nifty is falling but VIX is NOT rising → The fall is likely a small pullback, not a crash. Smart money isn't scared.
 If Nifty is rising but VIX is ALSO rising → Something unusual. Smart money is hedging despite rally. Be cautious.`
+        },
+        {
+          title: '📘 WORKED EXAMPLE: VIX Divergence',
+          body: `SCENARIO A - Normal Correlation:
+• Nifty falls 200 points (1%)
+• VIX rises from 13 to 16 (+23%)
+• Interpretation: Fall is genuine, fear is entering. Stay bearish.
+
+SCENARIO B - Divergence (Bullish):
+• Nifty falls 150 points (0.7%)
+• VIX rises from 13 to 13.5 (+3.8%)
+• Interpretation: Market fell but smart money ISN'T scared.
+  They're not buying puts aggressively. This is likely a pullback,
+  not a crash. Look for buying opportunity.
+
+┌─────────────────────────────────────────────┐
+│  VIX vs Nifty - What to Look For            │
+│                                             │
+│  Nifty ↓ + VIX ↑↑↑  = Real fall. Stay out. │
+│  Nifty ↓ + VIX →    = Pullback. Buy dips.  │
+│  Nifty ↑ + VIX ↓↓↓  = Healthy rally. Join. │
+│  Nifty ↑ + VIX ↑↑   = Suspicious. Caution. │
+└─────────────────────────────────────────────┘
+
+SCENARIO C - VIX Spike (Real-world example):
+• Date: Election result day
+• VIX at open: 14
+• VIX at 10 AM: 25 (+78%!)
+• Nifty: Gap up 500 points
+
+WHAT TO DO: NOTHING. VIX at 25 means:
+• Options are 3x expensive
+• Even buying ATM CE at ₹400 (normally ₹150)
+• If VIX normalizes to 15 tomorrow, your ₹400 CE becomes ₹200
+  even if Nifty stays at same level (IV crush)
+
+The engine would say: "⚠️ VIX HIGH. Reduce position size."
+Best action: WAIT for VIX to drop below 18, then enter.`
         }
       ]
     }
@@ -356,6 +570,44 @@ TRAPS (no signal):
 3. ATM volume-OI divergence is the earliest signal of a real move
 
 TIMING: This signal is most powerful between 10:00 AM - 11:30 AM. Early morning (9:15-10:00) has opening noise. After 2:00 PM, expiry-day effects dominate.`
+        },
+        {
+          title: '📘 WORKED EXAMPLE: Spotting a Fake Move',
+          body: `SCENARIO: Tuesday, 10:45 AM. Nifty suddenly drops 80 points in 15 minutes.
+
+You see: Nifty at 23,920 (was 24,000 at 10:30 AM)
+
+Panicking traders might BUY PE thinking "crash is coming!"
+But what does Volume-OI tell us?
+
+Near-ATM data:
+┌──────────┬─────────┬─────────┬──────────┬──────────┐
+│ Strike   │ CE Vol  │ CE OI Δ │ PE Vol   │ PE OI Δ  │
+├──────────┼─────────┼─────────┼──────────┼──────────┤
+│ 23,900   │ 2.5L    │ +0.8L   │ 4.2L     │ -1.5L    │
+│ 23,950   │ 1.8L    │ +0.5L   │ 3.8L     │ -2.0L    │
+│ 24,000   │ 3.0L    │ +1.2L   │ 5.0L     │ -3.0L    │
+│ 24,050   │ 1.5L    │ +0.3L   │ 2.0L     │ -0.8L    │
+└──────────┴─────────┴─────────┴──────────┴──────────┘
+
+READING THIS:
+• Put Volume is HIGH (lots of trading in puts) ✓
+• But Put OI is DECREASING (−1.5L, −2.0L, −3.0L)
+• This means: Put holders are CLOSING positions, not opening new ones!
+
+INTERPRETATION:
+High put volume + OI decrease = PUT UNWINDING
+→ People who sold puts earlier are buying them back (taking profits)
+→ This is NOT fresh bearish activity
+→ The 80-point drop is likely SHORT COVERING / profit booking
+→ Score: -1 (support weakening, mildly bearish but NOT a crash signal)
+
+TRAP AVOIDED:
+If you had bought PE at 23,900 for ₹180 thinking "crash!"...
+Nifty bounced back to 23,980 by 12:30 PM.
+Your PE would be at ₹120. Loss: 33%.
+
+The Volume-OI divergence rule PREVENTED this by showing the move wasn't backed by fresh conviction.`
         }
       ]
     }
