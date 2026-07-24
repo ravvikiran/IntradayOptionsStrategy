@@ -13,24 +13,11 @@ class NSEService {
 
   /**
    * Get option chain data for a symbol
-   * @param {string} symbol - NIFTY, BANKNIFTY, or stock symbol
+   * @param {string} symbol - NIFTY, BANKNIFTY, FINNIFTY, MIDCPNIFTY
    */
   async getOptionChain(symbol) {
     try {
-      // Index symbols that use getIndexOptionChain
-      const indexSymbols = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY'];
-      if (indexSymbols.includes(symbol)) {
-        return await this.nse.getIndexOptionChain(symbol);
-      } else {
-        // For equity options, try getDataByEndpoint with the equities URL
-        // This may return limited data due to NSE restrictions
-        const data = await this.nse.getDataByEndpoint(`/api/option-chain-equities?symbol=${symbol}`);
-        if (data && data.records && data.filtered) {
-          return data;
-        }
-        // Fallback: throw descriptive error
-        throw new Error(`Equity option chain for ${symbol} is currently unavailable. NSE restricts access to equity option data. Try NIFTY or BANKNIFTY for reliable signals.`);
-      }
+      return await this.nse.getIndexOptionChain(symbol);
     } catch (error) {
       console.error(`Option chain fetch error for ${symbol}:`, error.message);
       throw error;
