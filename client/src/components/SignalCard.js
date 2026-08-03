@@ -73,15 +73,13 @@ function SignalCard({ signal }) {
           Generated: {new Date(signal.timestamp).toLocaleString('en-IN')}
         </p>
 
-        {signal.direction !== 'NEUTRAL' && (
-          <button
-            className="save-journal-btn"
-            onClick={handleSaveToJournal}
-            disabled={saving || saved}
-          >
-            {saved ? '✅ Saved to Journal' : saving ? 'Saving...' : '📝 Save to Journal'}
-          </button>
-        )}
+        <button
+          className="save-journal-btn"
+          onClick={handleSaveToJournal}
+          disabled={saving || saved}
+        >
+          {saved ? '✅ Saved to Journal' : saving ? 'Saving...' : '📝 Save to Journal'}
+        </button>
       </div>
 
       {/* Rule Breakdown */}
