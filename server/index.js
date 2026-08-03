@@ -5,6 +5,7 @@ const fs = require('fs');
 const nseRoutes = require('./routes/nseRoutes');
 const signalRoutes = require('./routes/signalRoutes');
 const learningRoutes = require('./routes/learningRoutes');
+const journalRoutes = require('./routes/journalRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -16,6 +17,7 @@ app.use(express.json());
 app.use('/api/nse', nseRoutes);
 app.use('/api/signals', signalRoutes);
 app.use('/api/learning', learningRoutes);
+app.use('/api/journal', journalRoutes);
 
 // Serve static files from client build (works in both dev and production)
 const buildPath = path.join(__dirname, '../client/build');

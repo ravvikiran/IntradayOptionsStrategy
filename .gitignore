@@ -9,3 +9,4 @@ Thumbs.db
 .kiro/
 package-lock.json
 client/package-lock.json
+server/data/journal.json

@@ -1,11 +1,45 @@
-import React from 'react';
+import React, { useState } from 'react';
+import axios from 'axios';
 
 function SignalCard({ signal }) {
+  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+
   const isLean = signal.signal?.includes('LEAN');
   const dirClass = signal.direction === 'BULLISH' ? 'bullish' : signal.direction === 'BEARISH' ? 'bearish' : 'neutral';
   const scoreBarClass = signal.totalScore > 0 ? 'bullish' : signal.totalScore < 0 ? 'bearish' : 'neutral';
   const maxScore = 10; // Max possible absolute score (2+1+2+2+1+1+1)
   const scorePercent = Math.min(Math.abs(signal.totalScore) / maxScore * 100, 100);
+
+  const handleSaveToJournal = async () => {
+    setSaving(true);
+    try {
+      const entry = {
+        symbol: signal.symbol,
+        spotPrice: signal.spotPrice,
+        signal: signal.signal,
+        direction: signal.direction,
+        confidence: signal.confidence,
+        totalScore: signal.totalScore,
+        strikeIntraday: signal.strikeRecommendation?.intraday?.strike || null,
+        strikePositional: signal.strikeRecommendation?.positional?.strike || null,
+        strikeType: signal.direction === 'BULLISH' ? 'CE' : 'PE',
+        entryPrice: null,
+        exitPrice: null,
+        quantity: null,
+        pnl: null,
+        notes: '',
+        riskManagement: signal.riskManagement,
+      };
+      await axios.post('/api/journal', entry);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err) {
+      alert('Failed to save');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div>
@@ -38,6 +72,16 @@ function SignalCard({ signal }) {
         <p style={{color: '#8b949e', fontSize: '0.8rem', marginTop: '0.5rem'}}>
           Generated: {new Date(signal.timestamp).toLocaleString('en-IN')}
         </p>
+
+        {signal.direction !== 'NEUTRAL' && (
+          <button
+            className="save-journal-btn"
+            onClick={handleSaveToJournal}
+            disabled={saving || saved}
+          >
+            {saved ? '✅ Saved to Journal' : saving ? 'Saving...' : '📝 Save to Journal'}
+          </button>
+        )}
       </div>
 
       {/* Rule Breakdown */}
