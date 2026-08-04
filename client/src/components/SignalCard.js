@@ -14,22 +14,45 @@ function SignalCard({ signal }) {
   const handleSaveToJournal = async () => {
     setSaving(true);
     try {
+      const strikePrice = signal.strikeRecommendation?.intraday?.strike || 0;
+      const riskMgmt = signal.riskManagement || {};
+
+      // Parse stop loss and target from risk management text
+      let stopLoss = 0;
+      let target = 0;
+
+      // Get OI-based support/resistance from rule results
+      const oiRule = signal.ruleResults?.find(r => r.rule === 'OI Support/Resistance');
+      if (oiRule && oiRule.value) {
+        const supportMatch = oiRule.value.match(/Support:\s*(\d+)/);
+        const resistanceMatch = oiRule.value.match(/Resistance:\s*(\d+)/);
+        if (signal.direction === 'BULLISH') {
+          stopLoss = supportMatch ? parseFloat(supportMatch[1]) : 0;
+          target = resistanceMatch ? parseFloat(resistanceMatch[1]) : 0;
+        } else if (signal.direction === 'BEARISH') {
+          stopLoss = resistanceMatch ? parseFloat(resistanceMatch[1]) : 0;
+          target = supportMatch ? parseFloat(supportMatch[1]) : 0;
+        }
+      }
+
       const entry = {
         symbol: signal.symbol,
-        spotPrice: signal.spotPrice,
-        signal: signal.signal,
-        direction: signal.direction,
+        name: signal.symbol,
+        sector: 'Index',
+        exchange: 'NSE',
+        market: 'india',
+        scanType: 'signal_engine',
+        entryPrice: strikePrice,
+        stopLoss,
+        target,
+        qualityScore: signal.totalScore,
         confidence: signal.confidence,
-        totalScore: signal.totalScore,
-        strikeIntraday: signal.strikeRecommendation?.intraday?.strike || null,
-        strikePositional: signal.strikeRecommendation?.positional?.strike || null,
-        strikeType: signal.direction === 'BULLISH' ? 'CE' : 'PE',
-        entryPrice: null,
-        exitPrice: null,
-        quantity: null,
-        pnl: null,
-        notes: '',
-        riskManagement: signal.riskManagement,
+        direction: signal.direction,
+        strikePrice,
+        strikeType: signal.direction === 'BULLISH' ? 'CE' : signal.direction === 'BEARISH' ? 'PE' : '',
+        spotAtEntry: signal.spotPrice,
+        signals: signal.ruleResults?.filter(r => r.score !== 0).map(r => `${r.rule}: ${r.score > 0 ? '+' : ''}${r.score}`) || [],
+        notes: `Signal: ${signal.signal} | Confidence: ${signal.confidence} | Intraday: ${signal.strikeRecommendation?.intraday?.explanation || 'N/A'}`,
       };
       await axios.post('/api/journal', entry);
       setSaved(true);

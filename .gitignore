@@ -10,3 +10,4 @@ Thumbs.db
 package-lock.json
 client/package-lock.json
 server/data/journal.json
+server/data/trade-journal.json

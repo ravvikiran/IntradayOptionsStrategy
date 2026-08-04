@@ -3,16 +3,21 @@ import axios from 'axios';
 
 function Journal() {
   const [entries, setEntries] = useState([]);
+  const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
-  const [editingId, setEditingId] = useState(null);
-  const [editForm, setEditForm] = useState({});
-  const [refreshingId, setRefreshingId] = useState(null);
-  const [liveData, setLiveData] = useState({}); // {entryId: {spotPrice, timestamp}}
+  const [activeTab, setActiveTab] = useState('open');
+  const [checkingPrices, setCheckingPrices] = useState(false);
+  const [closingId, setClosingId] = useState(null);
+  const [closePrice, setClosePrice] = useState('');
 
-  const fetchEntries = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     try {
-      const res = await axios.get('/api/journal');
-      setEntries(res.data);
+      const [entriesRes, statsRes] = await Promise.all([
+        axios.get('/api/journal'),
+        axios.get('/api/journal/stats'),
+      ]);
+      setEntries(entriesRes.data);
+      setStats(statsRes.data);
     } catch (err) {
       console.error('Failed to fetch journal');
     } finally {
@@ -20,356 +25,280 @@ function Journal() {
     }
   }, []);
 
-  useEffect(() => { fetchEntries(); }, [fetchEntries]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
-  const handleEdit = (entry) => {
-    setEditingId(entry.id);
-    setEditForm({
-      entryPrice: entry.entryPrice || '',
-      exitPrice: entry.exitPrice || '',
-      quantity: entry.quantity || '',
-      notes: entry.notes || '',
-      status: entry.status || 'OPEN',
-      feedback: entry.feedback || '',
-      feedbackRating: entry.feedbackRating || '',
-    });
+  const handleCheckPrices = async () => {
+    setCheckingPrices(true);
+    try {
+      await axios.post('/api/journal/check-prices');
+      await fetchData();
+    } catch (err) {
+      alert('Failed to check prices. Market may be closed.');
+    } finally {
+      setCheckingPrices(false);
+    }
   };
 
-  const handleSave = async (id) => {
-    const updates = { ...editForm };
-    if (updates.entryPrice) updates.entryPrice = parseFloat(updates.entryPrice);
-    if (updates.exitPrice) updates.exitPrice = parseFloat(updates.exitPrice);
-    if (updates.quantity) updates.quantity = parseInt(updates.quantity);
-
-    // Calculate P&L if both entry and exit exist
-    if (updates.entryPrice && updates.exitPrice && updates.quantity) {
-      updates.pnl = (updates.exitPrice - updates.entryPrice) * updates.quantity;
-      if (updates.status === 'OPEN') {
-        updates.status = updates.pnl >= 0 ? 'PROFIT' : 'LOSS';
-      }
-    }
-
+  const handleCloseTrade = async (id) => {
+    if (!closePrice) { alert('Enter exit price'); return; }
     try {
-      await axios.put(`/api/journal/${id}`, updates);
-      setEditingId(null);
-      fetchEntries();
+      await axios.post(`/api/journal/${id}/close`, { exitPrice: parseFloat(closePrice) });
+      setClosingId(null);
+      setClosePrice('');
+      await fetchData();
     } catch (err) {
-      alert('Failed to update');
+      alert('Failed to close trade');
+    }
+  };
+
+  const handleFeedback = async (id, feedback) => {
+    const feedbackNote = prompt('Any notes about this feedback? (optional)') || '';
+    try {
+      await axios.post(`/api/journal/${id}/feedback`, { feedback, feedbackNote });
+      await fetchData();
+    } catch (err) {
+      alert('Failed to save feedback');
     }
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Delete this entry?')) return;
+    if (!window.confirm('Delete this trade?')) return;
     try {
       await axios.delete(`/api/journal/${id}`);
-      fetchEntries();
+      await fetchData();
     } catch (err) {
       alert('Failed to delete');
     }
   };
 
-  // Refresh: fetch current spot price for the entry's symbol
-  const handleRefresh = async (entry) => {
-    setRefreshingId(entry.id);
-    try {
-      const res = await axios.get(`/api/signals/generate/${entry.symbol}`);
-      const currentSpot = res.data.spotPrice;
-      const spotAtSignal = entry.spotPrice;
-      const direction = entry.direction;
-      const move = currentSpot - spotAtSignal;
-      const movePercent = ((move / spotAtSignal) * 100).toFixed(2);
-
-      let tradeStatus = '';
-      if (direction === 'BULLISH') {
-        tradeStatus = move > 0 ? `✅ Moved in favor (+${move.toFixed(1)} pts, +${movePercent}%)` : `❌ Moved against (${move.toFixed(1)} pts, ${movePercent}%)`;
-      } else {
-        tradeStatus = move < 0 ? `✅ Moved in favor (${move.toFixed(1)} pts, ${movePercent}%)` : `❌ Moved against (+${move.toFixed(1)} pts, +${movePercent}%)`;
-      }
-
-      setLiveData(prev => ({
-        ...prev,
-        [entry.id]: {
-          currentSpot,
-          spotAtSignal,
-          move: move.toFixed(1),
-          movePercent,
-          tradeStatus,
-          timestamp: new Date().toLocaleTimeString('en-IN'),
-          currentSignal: res.data.signal,
-          currentScore: res.data.totalScore,
-        }
-      }));
-    } catch (err) {
-      setLiveData(prev => ({
-        ...prev,
-        [entry.id]: { error: 'Failed to fetch. Market may be closed.' }
-      }));
-    } finally {
-      setRefreshingId(null);
-    }
+  const getStatusBadge = (status) => {
+    const map = {
+      'open': { label: 'OPEN', cls: 'status-open' },
+      'target_hit': { label: 'TARGET HIT ✓', cls: 'status-profit' },
+      'sl_hit': { label: 'SL HIT ✗', cls: 'status-loss' },
+      'closed_manual': { label: 'CLOSED', cls: 'status-closed' },
+    };
+    return map[status] || { label: status, cls: '' };
   };
 
-  const getStatusClass = (status) => {
-    if (status === 'PROFIT') return 'status-profit';
-    if (status === 'LOSS') return 'status-loss';
-    return 'status-open';
-  };
-
-  // Stats
-  const totalTrades = entries.filter(e => e.status !== 'OPEN').length;
-  const winners = entries.filter(e => e.status === 'PROFIT').length;
-  const losers = entries.filter(e => e.status === 'LOSS').length;
-  const totalPnl = entries.reduce((sum, e) => sum + (e.pnl || 0), 0);
-  const winRate = totalTrades > 0 ? ((winners / totalTrades) * 100).toFixed(0) : 0;
-
-  // Feedback stats
-  const feedbackEntries = entries.filter(e => e.feedbackRating);
-  const accurateSignals = feedbackEntries.filter(e => e.feedbackRating === 'accurate').length;
-  const signalAccuracy = feedbackEntries.length > 0 ? ((accurateSignals / feedbackEntries.length) * 100).toFixed(0) : '-';
+  const filteredEntries = activeTab === 'open'
+    ? entries.filter(e => e.status === 'open')
+    : entries.filter(e => e.status !== 'open');
 
   if (loading) return <div className="loading"><div className="loading-spinner"></div></div>;
 
   return (
     <div className="journal-page">
       <h1>📔 Trade Journal</h1>
-      <p>Track signals, give feedback on accuracy, and monitor live status.</p>
+      <p>Track trades, monitor live prices, auto-close at SL/target, give feedback.</p>
 
-      {/* Stats Summary */}
+      {/* Stats */}
       <div className="journal-stats">
         <div className="stat-card">
-          <span className="stat-value">{entries.length}</span>
-          <span className="stat-label">Total Saved</span>
+          <span className="stat-value">{stats.total || 0}</span>
+          <span className="stat-label">Total</span>
         </div>
         <div className="stat-card">
-          <span className="stat-value">{totalTrades}</span>
-          <span className="stat-label">Closed</span>
+          <span className="stat-value" style={{color:'#58a6ff'}}>{stats.open || 0}</span>
+          <span className="stat-label">Open</span>
         </div>
         <div className="stat-card">
-          <span className="stat-value" style={{color: '#3fb950'}}>{winners}</span>
-          <span className="stat-label">Winners</span>
+          <span className="stat-value" style={{color:'#3fb950'}}>{stats.wins || 0}</span>
+          <span className="stat-label">Wins</span>
         </div>
         <div className="stat-card">
-          <span className="stat-value" style={{color: '#f85149'}}>{losers}</span>
-          <span className="stat-label">Losers</span>
+          <span className="stat-value" style={{color:'#f85149'}}>{stats.losses || 0}</span>
+          <span className="stat-label">Losses</span>
         </div>
         <div className="stat-card">
-          <span className="stat-value">{winRate}%</span>
+          <span className="stat-value">{stats.winRate || 0}%</span>
           <span className="stat-label">Win Rate</span>
         </div>
         <div className="stat-card">
-          <span className="stat-value" style={{color: totalPnl >= 0 ? '#3fb950' : '#f85149'}}>
-            ₹{totalPnl.toLocaleString('en-IN')}
+          <span className="stat-value" style={{color: parseFloat(stats.totalPnl) >= 0 ? '#3fb950' : '#f85149'}}>
+            {parseFloat(stats.totalPnl) >= 0 ? '+' : ''}{stats.totalPnl || '0'}
           </span>
-          <span className="stat-label">Total P&L</span>
+          <span className="stat-label">Total P&L (pts)</span>
         </div>
-        <div className="stat-card">
-          <span className="stat-value" style={{color: '#58a6ff'}}>{signalAccuracy}%</span>
-          <span className="stat-label">Signal Accuracy</span>
-        </div>
+        {stats.signalAccuracy && (
+          <div className="stat-card">
+            <span className="stat-value" style={{color:'#a5d6ff'}}>{stats.signalAccuracy}%</span>
+            <span className="stat-label">Signal Accuracy</span>
+          </div>
+        )}
       </div>
 
-      {/* Entries */}
-      {entries.length === 0 ? (
+      {/* Tabs + Check Prices */}
+      <div className="journal-toolbar">
+        <div className="journal-tabs">
+          <button className={`tab-btn ${activeTab === 'open' ? 'active' : ''}`} onClick={() => setActiveTab('open')}>
+            Open ({entries.filter(e => e.status === 'open').length})
+          </button>
+          <button className={`tab-btn ${activeTab === 'closed' ? 'active' : ''}`} onClick={() => setActiveTab('closed')}>
+            Closed ({entries.filter(e => e.status !== 'open').length})
+          </button>
+        </div>
+        {activeTab === 'open' && (
+          <button className="check-prices-btn" onClick={handleCheckPrices} disabled={checkingPrices}>
+            {checkingPrices ? '⏳ Checking...' : '🔄 Check Prices'}
+          </button>
+        )}
+      </div>
+
+      {/* Trade Cards */}
+      {filteredEntries.length === 0 ? (
         <div className="journal-empty">
-          <p>No entries yet. Save a signal from the Dashboard to start tracking.</p>
+          <p>{activeTab === 'open' ? 'No open trades. Save a signal from the Dashboard.' : 'No closed trades yet.'}</p>
         </div>
       ) : (
         <div className="journal-entries">
-          {entries.map(entry => (
-            <div className={`journal-entry ${getStatusClass(entry.status)}`} key={entry.id}>
-              <div className="journal-entry-header">
-                <div>
-                  <span className="journal-symbol">{entry.symbol}</span>
-                  <span className={`journal-badge ${entry.direction === 'BULLISH' ? 'bullish' : 'bearish'}`}>
-                    {entry.strikeType} {entry.strikeIntraday}
-                  </span>
-                  <span className={`journal-status ${getStatusClass(entry.status)}`}>{entry.status}</span>
-                  {entry.feedbackRating && (
-                    <span className={`journal-feedback-tag ${entry.feedbackRating}`}>
-                      {entry.feedbackRating === 'accurate' ? '✓ Accurate' : entry.feedbackRating === 'partial' ? '~ Partial' : '✗ Wrong'}
-                    </span>
-                  )}
-                </div>
-                <div className="journal-actions">
-                  {editingId !== entry.id && (
-                    <>
-                      <button
-                        className="journal-btn refresh"
-                        onClick={() => handleRefresh(entry)}
-                        disabled={refreshingId === entry.id}
-                      >
-                        {refreshingId === entry.id ? '⏳' : '🔄'} Live
-                      </button>
-                      <button className="journal-btn edit" onClick={() => handleEdit(entry)}>✏️ Edit</button>
-                      <button className="journal-btn delete" onClick={() => handleDelete(entry.id)}>🗑️</button>
-                    </>
-                  )}
-                </div>
-              </div>
+          {filteredEntries.map(trade => {
+            const statusInfo = getStatusBadge(trade.status);
+            const isOpen = trade.status === 'open';
+            const hasUnrealized = trade.unrealizedSpotMove !== undefined;
 
-              {/* Live Refresh Data */}
-              {liveData[entry.id] && !liveData[entry.id].error && (
-                <div className="journal-live-data">
-                  <div className="live-header">📡 Live Status (as of {liveData[entry.id].timestamp})</div>
-                  <div className="live-grid">
-                    <div>
+            return (
+              <div className={`journal-entry ${statusInfo.cls}`} key={trade.id}>
+                <div className="journal-entry-header">
+                  <div className="trade-title">
+                    <span className="journal-symbol">{trade.symbol}</span>
+                    {trade.strikeType && trade.strikePrice && (
+                      <span className={`journal-badge ${trade.direction === 'BULLISH' ? 'bullish' : 'bearish'}`}>
+                        {trade.strikeType} {trade.strikePrice}
+                      </span>
+                    )}
+                    <span className={`journal-status ${statusInfo.cls}`}>{statusInfo.label}</span>
+                    {trade.feedback && (
+                      <span className={`journal-feedback-tag ${trade.feedback}`}>
+                        {trade.feedback === 'good_signal' ? '✓ Good' : trade.feedback === 'bad_signal' ? '✗ Bad' : trade.feedback === 'early_exit' ? '⏰ Early Exit' : '⏳ Late Entry'}
+                      </span>
+                    )}
+                  </div>
+                  <div className="journal-actions">
+                    {isOpen && closingId !== trade.id && (
+                      <button className="journal-btn" onClick={() => setClosingId(trade.id)}>Close Trade</button>
+                    )}
+                    <button className="journal-btn delete" onClick={() => handleDelete(trade.id)}>🗑️</button>
+                  </div>
+                </div>
+
+                {/* Trade Details Grid */}
+                <div className="journal-entry-details">
+                  <div className="journal-detail">
+                    <span className="detail-label">Spot at Entry</span>
+                    <span>₹{trade.spotAtEntry?.toLocaleString('en-IN')}</span>
+                  </div>
+                  {trade.currentPrice && isOpen && (
+                    <div className="journal-detail">
                       <span className="detail-label">Current Spot</span>
-                      <span>₹{liveData[entry.id].currentSpot?.toLocaleString('en-IN')}</span>
+                      <span>₹{trade.currentPrice?.toLocaleString('en-IN')}</span>
                     </div>
-                    <div>
-                      <span className="detail-label">Move from Signal</span>
-                      <span>{liveData[entry.id].tradeStatus}</span>
-                    </div>
-                    <div>
-                      <span className="detail-label">Current Signal</span>
-                      <span>{liveData[entry.id].currentSignal} (Score: {liveData[entry.id].currentScore})</span>
-                    </div>
+                  )}
+                  <div className="journal-detail">
+                    <span className="detail-label">Stop Loss</span>
+                    <span style={{color:'#f85149'}}>₹{trade.stopLoss?.toLocaleString('en-IN')}</span>
                   </div>
+                  <div className="journal-detail">
+                    <span className="detail-label">Target</span>
+                    <span style={{color:'#3fb950'}}>₹{trade.target?.toLocaleString('en-IN')}</span>
+                  </div>
+                  {trade.riskReward && (
+                    <div className="journal-detail">
+                      <span className="detail-label">R:R</span>
+                      <span>{trade.riskReward}</span>
+                    </div>
+                  )}
+                  <div className="journal-detail">
+                    <span className="detail-label">Score / Confidence</span>
+                    <span>{trade.qualityScore} / {trade.confidence}</span>
+                  </div>
+                  <div className="journal-detail">
+                    <span className="detail-label">Entry Date</span>
+                    <span>{new Date(trade.entryDate).toLocaleString('en-IN')}</span>
+                  </div>
+                  {/* Unrealized P&L for open trades */}
+                  {isOpen && hasUnrealized && (
+                    <div className="journal-detail">
+                      <span className="detail-label">Unrealized Move</span>
+                      <span style={{color: trade.unrealizedSpotMove >= 0 ? (trade.direction === 'BULLISH' ? '#3fb950' : '#f85149') : (trade.direction === 'BEARISH' ? '#3fb950' : '#f85149'), fontWeight: 700}}>
+                        {trade.unrealizedSpotMove >= 0 ? '+' : ''}{trade.unrealizedSpotMove} pts ({trade.unrealizedSpotMovePercent}%)
+                      </span>
+                    </div>
+                  )}
+                  {/* Realized P&L for closed trades */}
+                  {!isOpen && trade.pnl !== null && (
+                    <div className="journal-detail">
+                      <span className="detail-label">P&L</span>
+                      <span style={{color: trade.pnl >= 0 ? '#3fb950' : '#f85149', fontWeight: 700}}>
+                        {trade.pnl >= 0 ? '+' : ''}{trade.pnl} pts ({trade.pnlPercent}%)
+                      </span>
+                    </div>
+                  )}
+                  {trade.exitPrice && (
+                    <div className="journal-detail">
+                      <span className="detail-label">Exit Price</span>
+                      <span>₹{trade.exitPrice?.toLocaleString('en-IN')}</span>
+                    </div>
+                  )}
+                  {trade.lastChecked && isOpen && (
+                    <div className="journal-detail">
+                      <span className="detail-label">Last Checked</span>
+                      <span>{new Date(trade.lastChecked).toLocaleTimeString('en-IN')}</span>
+                    </div>
+                  )}
                 </div>
-              )}
-              {liveData[entry.id]?.error && (
-                <div className="journal-live-data error">
-                  <span>⚠️ {liveData[entry.id].error}</span>
-                </div>
-              )}
 
-              <div className="journal-entry-details">
-                <div className="journal-detail">
-                  <span className="detail-label">Signal</span>
-                  <span>{entry.signal} (Score: {entry.totalScore})</span>
-                </div>
-                <div className="journal-detail">
-                  <span className="detail-label">Spot at Signal</span>
-                  <span>₹{entry.spotPrice?.toLocaleString('en-IN')}</span>
-                </div>
-                <div className="journal-detail">
-                  <span className="detail-label">Confidence</span>
-                  <span>{entry.confidence}</span>
-                </div>
-                <div className="journal-detail">
-                  <span className="detail-label">Saved On</span>
-                  <span>{new Date(entry.createdAt).toLocaleString('en-IN')}</span>
-                </div>
-                {entry.entryPrice && (
-                  <div className="journal-detail">
-                    <span className="detail-label">Entry Price</span>
-                    <span>₹{entry.entryPrice}</span>
+                {/* Signals */}
+                {trade.signals && trade.signals.length > 0 && (
+                  <div className="trade-signals">
+                    <span className="detail-label">Signals</span>
+                    <div className="signal-tags">
+                      {trade.signals.map((s, i) => <span key={i} className="signal-tag">{s}</span>)}
+                    </div>
                   </div>
                 )}
-                {entry.exitPrice && (
-                  <div className="journal-detail">
-                    <span className="detail-label">Exit Price</span>
-                    <span>₹{entry.exitPrice}</span>
-                  </div>
-                )}
-                {entry.quantity && (
-                  <div className="journal-detail">
-                    <span className="detail-label">Quantity</span>
-                    <span>{entry.quantity}</span>
-                  </div>
-                )}
-                {entry.pnl !== null && entry.pnl !== undefined && (
-                  <div className="journal-detail">
-                    <span className="detail-label">P&L</span>
-                    <span style={{color: entry.pnl >= 0 ? '#3fb950' : '#f85149', fontWeight: 700}}>
-                      {entry.pnl >= 0 ? '+' : ''}₹{entry.pnl?.toLocaleString('en-IN')}
-                    </span>
-                  </div>
-                )}
-                {entry.notes && (
-                  <div className="journal-detail full-width">
+
+                {/* Notes */}
+                {trade.notes && (
+                  <div className="trade-notes">
                     <span className="detail-label">Notes</span>
-                    <span>{entry.notes}</span>
+                    <p>{trade.notes}</p>
                   </div>
                 )}
-                {entry.feedback && (
-                  <div className="journal-detail full-width">
-                    <span className="detail-label">Feedback</span>
-                    <span>{entry.feedback}</span>
+                {trade.feedbackNote && (
+                  <div className="trade-notes">
+                    <span className="detail-label">Feedback Note</span>
+                    <p>{trade.feedbackNote}</p>
+                  </div>
+                )}
+
+                {/* Close Trade Form */}
+                {closingId === trade.id && (
+                  <div className="close-trade-form">
+                    <input
+                      type="number"
+                      placeholder="Exit price (spot)"
+                      value={closePrice}
+                      onChange={e => setClosePrice(e.target.value)}
+                    />
+                    <button className="journal-btn save" onClick={() => handleCloseTrade(trade.id)}>Confirm Close</button>
+                    <button className="journal-btn cancel" onClick={() => { setClosingId(null); setClosePrice(''); }}>Cancel</button>
+                  </div>
+                )}
+
+                {/* Feedback Buttons */}
+                {!trade.feedback && (
+                  <div className="feedback-buttons">
+                    <span className="detail-label">Rate Signal:</span>
+                    <button className="fb-btn good" onClick={() => handleFeedback(trade.id, 'good_signal')}>✓ Good Signal</button>
+                    <button className="fb-btn bad" onClick={() => handleFeedback(trade.id, 'bad_signal')}>✗ Bad Signal</button>
+                    <button className="fb-btn early" onClick={() => handleFeedback(trade.id, 'early_exit')}>⏰ Early Exit</button>
+                    <button className="fb-btn late" onClick={() => handleFeedback(trade.id, 'late_entry')}>⏳ Late Entry</button>
                   </div>
                 )}
               </div>
-
-              {/* Edit Form */}
-              {editingId === entry.id && (
-                <div className="journal-edit-form">
-                  <div className="edit-row">
-                    <label>Entry Price (₹)</label>
-                    <input
-                      type="number"
-                      placeholder="e.g. 150"
-                      value={editForm.entryPrice}
-                      onChange={e => setEditForm({...editForm, entryPrice: e.target.value})}
-                    />
-                  </div>
-                  <div className="edit-row">
-                    <label>Exit Price (₹)</label>
-                    <input
-                      type="number"
-                      placeholder="e.g. 200"
-                      value={editForm.exitPrice}
-                      onChange={e => setEditForm({...editForm, exitPrice: e.target.value})}
-                    />
-                  </div>
-                  <div className="edit-row">
-                    <label>Quantity (lots × lot size)</label>
-                    <input
-                      type="number"
-                      placeholder="e.g. 25"
-                      value={editForm.quantity}
-                      onChange={e => setEditForm({...editForm, quantity: e.target.value})}
-                    />
-                  </div>
-                  <div className="edit-row">
-                    <label>Status</label>
-                    <select
-                      value={editForm.status}
-                      onChange={e => setEditForm({...editForm, status: e.target.value})}
-                    >
-                      <option value="OPEN">OPEN</option>
-                      <option value="PROFIT">PROFIT</option>
-                      <option value="LOSS">LOSS</option>
-                      <option value="EXITED">EXITED</option>
-                    </select>
-                  </div>
-                  <div className="edit-row full-width">
-                    <label>Signal Accuracy Rating</label>
-                    <select
-                      value={editForm.feedbackRating}
-                      onChange={e => setEditForm({...editForm, feedbackRating: e.target.value})}
-                    >
-                      <option value="">-- Rate this signal --</option>
-                      <option value="accurate">✓ Accurate - Direction was correct</option>
-                      <option value="partial">~ Partially correct - Direction right but timing/entry was off</option>
-                      <option value="wrong">✗ Wrong - Direction was incorrect</option>
-                    </select>
-                  </div>
-                  <div className="edit-row full-width">
-                    <label>Feedback (What went right/wrong? What would you improve?)</label>
-                    <textarea
-                      placeholder="e.g. Signal said bearish but market gapped up due to global cues. OI analysis was correct but VIX rule gave wrong weight. Consider reducing VIX weight on gap days."
-                      value={editForm.feedback}
-                      onChange={e => setEditForm({...editForm, feedback: e.target.value})}
-                      rows={4}
-                    />
-                  </div>
-                  <div className="edit-row full-width">
-                    <label>Notes (Personal trade notes)</label>
-                    <textarea
-                      placeholder="Why did you take/skip this trade? Emotions? What happened?"
-                      value={editForm.notes}
-                      onChange={e => setEditForm({...editForm, notes: e.target.value})}
-                      rows={3}
-                    />
-                  </div>
-                  <div className="edit-actions">
-                    <button className="journal-btn save" onClick={() => handleSave(entry.id)}>💾 Save</button>
-                    <button className="journal-btn cancel" onClick={() => setEditingId(null)}>Cancel</button>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
