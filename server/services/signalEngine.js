@@ -489,13 +489,10 @@ class SignalEngine {
       tradeType = '';
     }
 
-    // Get strike recommendations
-    const intradayRec = direction !== 'NEUTRAL'
-      ? this.getStrikeRecommendation(optionChainData, direction, 'intraday')
-      : null;
-    const positionalRec = direction !== 'NEUTRAL'
-      ? this.getStrikeRecommendation(optionChainData, direction, 'positional')
-      : null;
+    // Get strike recommendations (always show, use score direction for lean/neutral)
+    const recDirection = totalScore > 0 ? 'BULLISH' : totalScore < 0 ? 'BEARISH' : 'BULLISH';
+    const intradayRec = this.getStrikeRecommendation(optionChainData, recDirection, 'intraday');
+    const positionalRec = this.getStrikeRecommendation(optionChainData, recDirection, 'positional');
 
     // Risk management
     const riskManagement = this.getRiskManagement(direction, spotPrice, optionChainData);

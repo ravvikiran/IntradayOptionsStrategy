@@ -105,24 +105,7 @@ function SignalCard({ signal }) {
         </button>
       </div>
 
-      {/* Rule Breakdown */}
-      <div className="rule-results">
-        <h3>📋 Rule-by-Rule Breakdown (Why this signal was generated)</h3>
-        {signal.ruleResults?.map((rule, idx) => (
-          <div className="rule-item" key={idx}>
-            <div className="rule-item-header">
-              <span className="rule-name">{rule.rule}</span>
-              <span className={`rule-score ${rule.score > 0 ? 'positive' : rule.score < 0 ? 'negative' : 'zero'}`}>
-                {rule.score > 0 ? '+' : ''}{rule.score}
-              </span>
-            </div>
-            <p className="rule-explanation">{rule.explanation}</p>
-            {rule.value && <p className="rule-value">📊 {rule.value}</p>}
-          </div>
-        ))}
-      </div>
-
-      {/* Strike Recommendation */}
+      {/* Strike Recommendation - FIRST */}
       {signal.strikeRecommendation?.intraday && (
         <div className="strike-section">
           <h3>🎯 Strike Recommendation</h3>
@@ -165,6 +148,23 @@ function SignalCard({ signal }) {
           </div>
         </div>
       )}
+
+      {/* Rule Breakdown - at the bottom for detailed explanation */}
+      <div className="rule-results">
+        <h3>📋 Rule-by-Rule Breakdown (Why this signal was generated)</h3>
+        {signal.ruleResults?.map((rule, idx) => (
+          <div className="rule-item" key={idx}>
+            <div className="rule-item-header">
+              <span className="rule-name">{rule.rule}</span>
+              <span className={`rule-score ${rule.score > 0 ? 'positive' : rule.score < 0 ? 'negative' : 'zero'}`}>
+                {rule.score > 0 ? '+' : ''}{rule.score}
+              </span>
+            </div>
+            <p className="rule-explanation">{rule.explanation}</p>
+            {rule.value && <p className="rule-value">📊 {rule.value}</p>}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
