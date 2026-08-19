@@ -3,11 +3,19 @@ const router = express.Router();
 const nseService = require('../services/nseService');
 const signalEngine = require('../services/signalEngine');
 
+const VALID_SYMBOLS = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY'];
+
 // Generate signal for a symbol
 router.get('/generate/:symbol', async (req, res) => {
   try {
-    const { symbol } = req.params;
-    const upperSymbol = symbol.toUpperCase();
+    const upperSymbol = req.params.symbol.toUpperCase();
+
+    if (!VALID_SYMBOLS.includes(upperSymbol)) {
+      return res.status(400).json({
+        error: 'Invalid symbol',
+        message: `Symbol must be one of: ${VALID_SYMBOLS.join(', ')}`,
+      });
+    }
 
     // Fetch required data (VIX failure shouldn't block signal generation)
     let optionChainData, vixData;
@@ -18,11 +26,17 @@ router.get('/generate/:symbol', async (req, res) => {
       ]);
     } catch (err) {
       // If option chain fails, we can't generate signal
-      return res.status(500).json({ error: 'Failed to fetch option chain data', message: err.message });
+      return res.status(503).json({
+        error: 'Failed to fetch option chain data',
+        message: err.message,
+      });
     }
 
     if (!optionChainData || !optionChainData.filtered || !optionChainData.records) {
-      return res.status(500).json({ error: 'Invalid option chain data received from NSE', message: 'Data structure unexpected. Market may be closed.' });
+      return res.status(502).json({
+        error: 'Invalid option chain data received from NSE',
+        message: 'Data structure unexpected. Market may be closed.',
+      });
     }
 
     // Generate signal

@@ -6,6 +6,7 @@ function SignalCard({ signal }) {
   const [saving, setSaving] = useState(false);
 
   const isLean = signal.signal?.includes('LEAN');
+  const isNoSignal = signal.direction === 'NEUTRAL';
   const dirClass = signal.direction === 'BULLISH' ? 'bullish' : signal.direction === 'BEARISH' ? 'bearish' : 'neutral';
   const scoreBarClass = signal.totalScore > 0 ? 'bullish' : signal.totalScore < 0 ? 'bearish' : 'neutral';
   const maxScore = 10; // Max possible absolute score (2+1+2+2+1+1+1)
@@ -99,9 +100,10 @@ function SignalCard({ signal }) {
         <button
           className="save-journal-btn"
           onClick={handleSaveToJournal}
-          disabled={saving || saved}
+          disabled={saving || saved || isNoSignal}
+          title={isNoSignal ? 'Cannot save - no actionable signal' : 'Save this signal to your trade journal'}
         >
-          {saved ? '✅ Saved to Journal' : saving ? 'Saving...' : '📝 Save to Journal'}
+          {saved ? '✅ Saved to Journal' : saving ? 'Saving...' : isNoSignal ? '—  No Signal to Save' : '📝 Save to Journal'}
         </button>
       </div>
 

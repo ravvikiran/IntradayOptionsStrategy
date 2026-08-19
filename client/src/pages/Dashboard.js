@@ -24,7 +24,7 @@ function Dashboard() {
       setSignal(response.data);
       setLastUpdate(new Date().toLocaleTimeString('en-IN'));
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to fetch signal. NSE might be down or market is closed.');
+      setError(err.response?.data?.message || err.response?.data?.error || 'Failed to fetch signal. NSE might be down or market is closed.');
       setSignal(null);
     } finally {
       setLoading(false);

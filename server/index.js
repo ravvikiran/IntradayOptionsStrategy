@@ -19,18 +19,26 @@ app.use('/api/signals', signalRoutes);
 app.use('/api/learning', learningRoutes);
 app.use('/api/journal', journalRoutes);
 
+// 404 handler for API routes
+app.all('/api/*', (req, res) => {
+  res.status(404).json({ error: 'API endpoint not found' });
+});
+
 // Serve static files from client build (works in both dev and production)
 const buildPath = path.join(__dirname, '../client/build');
 if (fs.existsSync(buildPath)) {
   app.use(express.static(buildPath));
-  // Only serve index.html for non-API routes (SPA fallback)
+  // SPA fallback - serve index.html for non-API routes
   app.get('*', (req, res) => {
-    if (req.path.startsWith('/api/')) {
-      return res.status(404).json({ error: 'API endpoint not found' });
-    }
     res.sendFile(path.join(buildPath, 'index.html'));
   });
 }
+
+// Global error handler
+app.use((err, req, res, _next) => {
+  console.error('Unhandled error:', err.message);
+  res.status(500).json({ error: 'Internal server error', message: err.message });
+});
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

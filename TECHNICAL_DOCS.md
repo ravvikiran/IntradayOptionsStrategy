@@ -28,15 +28,16 @@ The signal engine uses a **weighted scoring system** where each rule independent
 | Volume-OI Divergence | ±1 | Is the current move genuine or a trap |
 
 **Total possible score: ±10**
-**Signal threshold: ±5**
+**Signal threshold: ±3**
+**HIGH confidence threshold: ±5**
 
-This means at minimum 3 strong rules or 5 moderate rules must agree for a signal to trigger.
+This means at minimum 2 strong rules or 3 moderate rules must agree for a signal to trigger.
 
 ### Signal Output
 
 Every signal includes:
 1. **Direction**: BULLISH (BUY CE) / BEARISH (BUY PE) / NEUTRAL (no trade)
-2. **Confidence**: HIGH (score ≥7) / MEDIUM (score 5-6)
+2. **Confidence**: HIGH (score ≥5) / MEDIUM (score 3-4)
 3. **Rule breakdown**: Each rule's individual score and plain-English explanation
 4. **Strike recommendation**: Specific strikes for intraday and positional
 5. **Risk management**: Stop-loss, target, position size, time rules

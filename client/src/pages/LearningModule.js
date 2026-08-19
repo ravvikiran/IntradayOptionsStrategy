@@ -35,7 +35,7 @@ function LearningModule() {
       {module.content?.sections?.map((section, idx) => (
         <div className="content-section" key={idx}>
           <h2>{section.title}</h2>
-          <div className="body">{section.body}</div>
+          <div className="body" style={{whiteSpace: 'pre-wrap', lineHeight: 1.8}}>{section.body}</div>
         </div>
       ))}
     </div>

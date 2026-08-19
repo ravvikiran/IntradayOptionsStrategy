@@ -17,6 +17,9 @@ router.get('/option-chain/:symbol', async (req, res) => {
 router.get('/vix', async (req, res) => {
   try {
     const data = await nseService.getVIX();
+    if (!data) {
+      return res.status(404).json({ error: 'VIX data not available', message: 'Could not find India VIX in index data. Market may be closed.' });
+    }
     res.json(data);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch VIX', message: error.message });

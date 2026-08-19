@@ -9,10 +9,15 @@ const JOURNAL_FILE = path.join(__dirname, '../data/trade-journal.json');
 function getJournal() {
   try {
     if (!fs.existsSync(JOURNAL_FILE)) {
+      const dir = path.dirname(JOURNAL_FILE);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(JOURNAL_FILE, JSON.stringify([], null, 2));
     }
-    return JSON.parse(fs.readFileSync(JOURNAL_FILE, 'utf8'));
+    const raw = fs.readFileSync(JOURNAL_FILE, 'utf8');
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
   } catch (err) {
+    console.error('Failed to read journal:', err.message);
     return [];
   }
 }
@@ -24,7 +29,7 @@ function saveJournal(entries) {
 }
 
 // GET all trades
-router.get('/', async (req, res) => {
+router.get('/', (req, res) => {
   try {
     const entries = getJournal();
     res.json(entries);
@@ -84,6 +89,10 @@ router.get('/stats', (req, res) => {
 
 // POST save new trade
 router.post('/', (req, res) => {
+  if (!req.body.symbol) {
+    return res.status(400).json({ error: 'symbol is required' });
+  }
+
   const entries = getJournal();
   const trade = {
     id: Date.now().toString(),
@@ -105,7 +114,7 @@ router.post('/', (req, res) => {
     direction: req.body.direction || '',
     strikePrice: req.body.strikePrice || null,
     strikeType: req.body.strikeType || '',
-    spotAtEntry: req.body.spotAtEntry || 0,
+    spotAtEntry: parseFloat(req.body.spotAtEntry) || 0,
     exitPrice: null,
     exitDate: null,
     pnl: null,
@@ -135,23 +144,32 @@ router.post('/:id/close', (req, res) => {
   if (idx === -1) return res.status(404).json({ error: 'Trade not found' });
 
   const exitPrice = parseFloat(req.body.exitPrice);
-  if (!exitPrice) return res.status(400).json({ error: 'exitPrice required' });
+  if (!exitPrice || isNaN(exitPrice)) {
+    return res.status(400).json({ error: 'Valid exitPrice is required' });
+  }
 
   const trade = entries[idx];
+  if (trade.status !== 'open') {
+    return res.status(400).json({ error: 'Trade is already closed' });
+  }
+
   trade.exitPrice = exitPrice;
   trade.exitDate = new Date().toISOString();
   trade.status = 'closed_manual';
 
-  // Calculate P&L
+  // Calculate P&L based on spot movement
+  const entrySpot = trade.spotAtEntry || trade.entryPrice;
   if (trade.direction === 'BEARISH') {
-    trade.pnl = (trade.entryPrice - exitPrice) * (req.body.quantity || 1);
-    trade.pnlPercent = ((trade.entryPrice - exitPrice) / trade.entryPrice * 100);
+    trade.pnl = parseFloat((entrySpot - exitPrice).toFixed(2));
+    trade.pnlPercent = entrySpot > 0
+      ? parseFloat(((entrySpot - exitPrice) / entrySpot * 100).toFixed(2))
+      : 0;
   } else {
-    trade.pnl = (exitPrice - trade.entryPrice) * (req.body.quantity || 1);
-    trade.pnlPercent = ((exitPrice - trade.entryPrice) / trade.entryPrice * 100);
+    trade.pnl = parseFloat((exitPrice - entrySpot).toFixed(2));
+    trade.pnlPercent = entrySpot > 0
+      ? parseFloat(((exitPrice - entrySpot) / entrySpot * 100).toFixed(2))
+      : 0;
   }
-  trade.pnlPercent = parseFloat(trade.pnlPercent.toFixed(2));
-  trade.pnl = parseFloat(trade.pnl.toFixed(2));
 
   if (req.body.notes) trade.notes = req.body.notes;
 
@@ -163,6 +181,11 @@ router.post('/:id/close', (req, res) => {
 router.post('/check-prices', async (req, res) => {
   const entries = getJournal();
   const openTrades = entries.filter(e => e.status === 'open');
+
+  if (openTrades.length === 0) {
+    return res.json({ checked: 0, results: [], timestamp: new Date().toISOString() });
+  }
+
   const results = [];
 
   for (const trade of openTrades) {
@@ -170,7 +193,10 @@ router.post('/check-prices', async (req, res) => {
       // Fetch current spot price
       let currentPrice = 0;
       if (['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY'].includes(trade.symbol)) {
-        const indexData = await nseService.getIndexData(trade.symbol === 'BANKNIFTY' ? 'NIFTY BANK' : trade.symbol === 'NIFTY' ? 'NIFTY 50' : trade.symbol);
+        const indexName = trade.symbol === 'BANKNIFTY' ? 'NIFTY BANK'
+          : trade.symbol === 'NIFTY' ? 'NIFTY 50'
+          : trade.symbol;
+        const indexData = await nseService.getIndexData(indexName);
         if (indexData) {
           currentPrice = indexData.last || 0;
         }
@@ -202,32 +228,28 @@ router.post('/check-prices', async (req, res) => {
           entries[tradeIdx].status = 'target_hit';
           entries[tradeIdx].exitDate = new Date().toISOString();
           entries[tradeIdx].exitPrice = currentPrice;
-          const pnlPct = ((currentPrice - trade.spotAtEntry) / trade.spotAtEntry * 100);
-          entries[tradeIdx].pnlPercent = parseFloat(pnlPct.toFixed(2));
-          entries[tradeIdx].pnl = parseFloat(((currentPrice - trade.spotAtEntry)).toFixed(2));
+          entries[tradeIdx].pnl = parseFloat((currentPrice - trade.spotAtEntry).toFixed(2));
+          entries[tradeIdx].pnlPercent = parseFloat(((currentPrice - trade.spotAtEntry) / trade.spotAtEntry * 100).toFixed(2));
         } else if (trade.stopLoss && currentPrice <= trade.stopLoss) {
           entries[tradeIdx].status = 'sl_hit';
           entries[tradeIdx].exitDate = new Date().toISOString();
           entries[tradeIdx].exitPrice = currentPrice;
-          const pnlPct = ((currentPrice - trade.spotAtEntry) / trade.spotAtEntry * 100);
-          entries[tradeIdx].pnlPercent = parseFloat(pnlPct.toFixed(2));
-          entries[tradeIdx].pnl = parseFloat(((currentPrice - trade.spotAtEntry)).toFixed(2));
+          entries[tradeIdx].pnl = parseFloat((currentPrice - trade.spotAtEntry).toFixed(2));
+          entries[tradeIdx].pnlPercent = parseFloat(((currentPrice - trade.spotAtEntry) / trade.spotAtEntry * 100).toFixed(2));
         }
       } else if (trade.direction === 'BEARISH') {
         if (trade.target && currentPrice <= trade.target) {
           entries[tradeIdx].status = 'target_hit';
           entries[tradeIdx].exitDate = new Date().toISOString();
           entries[tradeIdx].exitPrice = currentPrice;
-          const pnlPct = ((trade.spotAtEntry - currentPrice) / trade.spotAtEntry * 100);
-          entries[tradeIdx].pnlPercent = parseFloat(pnlPct.toFixed(2));
-          entries[tradeIdx].pnl = parseFloat(((trade.spotAtEntry - currentPrice)).toFixed(2));
+          entries[tradeIdx].pnl = parseFloat((trade.spotAtEntry - currentPrice).toFixed(2));
+          entries[tradeIdx].pnlPercent = parseFloat(((trade.spotAtEntry - currentPrice) / trade.spotAtEntry * 100).toFixed(2));
         } else if (trade.stopLoss && currentPrice >= trade.stopLoss) {
           entries[tradeIdx].status = 'sl_hit';
           entries[tradeIdx].exitDate = new Date().toISOString();
           entries[tradeIdx].exitPrice = currentPrice;
-          const pnlPct = ((trade.spotAtEntry - currentPrice) / trade.spotAtEntry * 100);
-          entries[tradeIdx].pnlPercent = parseFloat(pnlPct.toFixed(2));
-          entries[tradeIdx].pnl = parseFloat(((trade.spotAtEntry - currentPrice)).toFixed(2));
+          entries[tradeIdx].pnl = parseFloat((trade.spotAtEntry - currentPrice).toFixed(2));
+          entries[tradeIdx].pnlPercent = parseFloat(((trade.spotAtEntry - currentPrice) / trade.spotAtEntry * 100).toFixed(2));
         }
       }
 
@@ -244,11 +266,20 @@ router.post('/check-prices', async (req, res) => {
 
 // POST add feedback
 router.post('/:id/feedback', (req, res) => {
+  if (!req.body.feedback) {
+    return res.status(400).json({ error: 'feedback field is required' });
+  }
+
+  const validFeedback = ['good_signal', 'bad_signal', 'early_exit', 'late_entry'];
+  if (!validFeedback.includes(req.body.feedback)) {
+    return res.status(400).json({ error: `feedback must be one of: ${validFeedback.join(', ')}` });
+  }
+
   const entries = getJournal();
   const idx = entries.findIndex(e => e.id === req.params.id);
   if (idx === -1) return res.status(404).json({ error: 'Trade not found' });
 
-  entries[idx].feedback = req.body.feedback; // good_signal, bad_signal, early_exit, late_entry
+  entries[idx].feedback = req.body.feedback;
   entries[idx].feedbackNote = req.body.feedbackNote || '';
   entries[idx].feedbackDate = new Date().toISOString();
 

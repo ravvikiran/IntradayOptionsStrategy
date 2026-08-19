@@ -6,6 +6,20 @@ const { NseIndia } = require('stock-nse-india');
  * for accessing NSE India data reliably.
  */
 
+const REQUEST_TIMEOUT = 15000; // 15 seconds
+
+/**
+ * Wraps a promise with a timeout
+ */
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    ),
+  ]);
+}
+
 class NSEService {
   constructor() {
     this.nse = new NseIndia();
@@ -17,7 +31,11 @@ class NSEService {
    */
   async getOptionChain(symbol) {
     try {
-      return await this.nse.getIndexOptionChain(symbol);
+      return await withTimeout(
+        this.nse.getIndexOptionChain(symbol),
+        REQUEST_TIMEOUT,
+        `getOptionChain(${symbol})`
+      );
     } catch (error) {
       console.error(`Option chain fetch error for ${symbol}:`, error.message);
       throw error;
@@ -29,7 +47,11 @@ class NSEService {
    */
   async getVIX() {
     try {
-      const data = await this.nse.getAllIndices();
+      const data = await withTimeout(
+        this.nse.getAllIndices(),
+        REQUEST_TIMEOUT,
+        'getVIX'
+      );
       if (!data || !data.data || !Array.isArray(data.data)) {
         console.error('VIX: Unexpected data structure from getAllIndices');
         return null;
@@ -47,7 +69,11 @@ class NSEService {
    */
   async getMarketStatus() {
     try {
-      return await this.nse.getMarketStatus();
+      return await withTimeout(
+        this.nse.getMarketStatus(),
+        REQUEST_TIMEOUT,
+        'getMarketStatus'
+      );
     } catch (error) {
       console.error('Failed to fetch market status:', error.message);
       throw error;
@@ -59,7 +85,11 @@ class NSEService {
    */
   async getIndexData(symbol) {
     try {
-      const data = await this.nse.getAllIndices();
+      const data = await withTimeout(
+        this.nse.getAllIndices(),
+        REQUEST_TIMEOUT,
+        `getIndexData(${symbol})`
+      );
       if (!data || !data.data || !Array.isArray(data.data)) {
         return null;
       }
@@ -76,7 +106,11 @@ class NSEService {
    */
   async getEquityQuote(symbol) {
     try {
-      return await this.nse.getEquityDetails(symbol);
+      return await withTimeout(
+        this.nse.getEquityDetails(symbol),
+        REQUEST_TIMEOUT,
+        `getEquityQuote(${symbol})`
+      );
     } catch (error) {
       console.error(`Failed to fetch equity quote for ${symbol}:`, error.message);
       throw error;
