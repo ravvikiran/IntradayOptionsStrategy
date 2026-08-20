@@ -31,6 +31,9 @@ router.get('/index/:symbol', async (req, res) => {
   try {
     const { symbol } = req.params;
     const data = await nseService.getIndexData(symbol.toUpperCase());
+    if (!data) {
+      return res.status(404).json({ error: 'Index not found', message: `No data found for index: ${symbol.toUpperCase()}` });
+    }
     res.json(data);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch index data', message: error.message });

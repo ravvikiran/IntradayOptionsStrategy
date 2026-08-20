@@ -22,7 +22,12 @@ function withTimeout(promise, ms, label) {
 
 class NSEService {
   constructor() {
-    this.nse = new NseIndia();
+    try {
+      this.nse = new NseIndia();
+    } catch (err) {
+      console.error('Failed to initialize NseIndia:', err.message);
+      this.nse = null;
+    }
   }
 
   /**
@@ -30,6 +35,7 @@ class NSEService {
    * @param {string} symbol - NIFTY, BANKNIFTY, FINNIFTY, MIDCPNIFTY
    */
   async getOptionChain(symbol) {
+    if (!this.nse) throw new Error('NSE service not initialized');
     try {
       return await withTimeout(
         this.nse.getIndexOptionChain(symbol),
@@ -46,6 +52,7 @@ class NSEService {
    * Get India VIX data
    */
   async getVIX() {
+    if (!this.nse) return null;
     try {
       const data = await withTimeout(
         this.nse.getAllIndices(),
@@ -68,6 +75,7 @@ class NSEService {
    * Get market status (open/closed)
    */
   async getMarketStatus() {
+    if (!this.nse) throw new Error('NSE service not initialized');
     try {
       return await withTimeout(
         this.nse.getMarketStatus(),
@@ -84,6 +92,7 @@ class NSEService {
    * Get index data (Nifty 50, Bank Nifty)
    */
   async getIndexData(symbol) {
+    if (!this.nse) return null;
     try {
       const data = await withTimeout(
         this.nse.getAllIndices(),
@@ -105,6 +114,7 @@ class NSEService {
    * Get equity quote for stock options
    */
   async getEquityQuote(symbol) {
+    if (!this.nse) throw new Error('NSE service not initialized');
     try {
       return await withTimeout(
         this.nse.getEquityDetails(symbol),

@@ -63,6 +63,7 @@ function Dashboard() {
         className="symbol-btn refresh-btn"
         onClick={() => fetchSignal(selectedSymbol)}
         disabled={loading}
+        aria-label="Refresh signal data"
       >
         🔄 Refresh Signal
       </button>

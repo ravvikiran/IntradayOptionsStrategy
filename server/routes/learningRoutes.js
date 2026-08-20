@@ -25,7 +25,11 @@ router.get('/modules/:id', (req, res) => {
 
 // Get trading rules/checklist
 router.get('/rules', (req, res) => {
-  res.json(learningContent.find(m => m.id === 'trading-rules'));
+  const rules = learningContent.find(m => m.id === 'trading-rules');
+  if (!rules) {
+    return res.status(404).json({ error: 'Trading rules module not found' });
+  }
+  res.json(rules);
 });
 
 module.exports = router;

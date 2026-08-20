@@ -20,7 +20,6 @@ class SignalEngine {
   constructor() {
     this.SIGNAL_THRESHOLD = 3; // Minimum score to trigger signal
     this.HIGH_CONFIDENCE_THRESHOLD = 5; // Score for HIGH confidence
-    this.rules = [];
   }
 
   /**
@@ -182,7 +181,6 @@ class SignalEngine {
    */
   analyzeChangeInOI(optionChainData) {
     const records = optionChainData.filtered?.data || [];
-    const spotPrice = optionChainData.records?.underlyingValue || 0;
 
     let totalCallOIChange = 0;
     let totalPutOIChange = 0;
@@ -229,6 +227,10 @@ class SignalEngine {
     const records = optionChainData.filtered?.data || [];
     const spotPrice = optionChainData.records?.underlyingValue || 0;
 
+    if (records.length === 0 || spotPrice === 0) {
+      return { rule: 'IV Analysis', score: 0, explanation: 'Insufficient data for IV analysis.', value: 'N/A' };
+    }
+
     // Find ATM strike
     let atmStrike = 0;
     let minDiff = Infinity;
@@ -243,6 +245,11 @@ class SignalEngine {
     const atmRecord = records.find(r => r.strikePrice === atmStrike);
     const atmCallIV = atmRecord?.CE?.impliedVolatility || 0;
     const atmPutIV = atmRecord?.PE?.impliedVolatility || 0;
+
+    if (atmCallIV === 0 && atmPutIV === 0) {
+      return { rule: 'IV Analysis', score: 0, explanation: 'IV data unavailable for ATM strike. Cannot assess volatility environment.', value: 'N/A' };
+    }
+
     const avgIV = (atmCallIV + atmPutIV) / 2;
 
     let score = 0;

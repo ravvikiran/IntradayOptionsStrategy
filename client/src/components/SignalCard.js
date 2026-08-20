@@ -5,7 +5,6 @@ function SignalCard({ signal }) {
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const isLean = signal.signal?.includes('LEAN');
   const isNoSignal = signal.direction === 'NEUTRAL';
   const dirClass = signal.direction === 'BULLISH' ? 'bullish' : signal.direction === 'BEARISH' ? 'bearish' : 'neutral';
   const scoreBarClass = signal.totalScore > 0 ? 'bullish' : signal.totalScore < 0 ? 'bearish' : 'neutral';

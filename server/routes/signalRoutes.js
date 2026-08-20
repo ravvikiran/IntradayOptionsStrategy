@@ -20,16 +20,19 @@ router.get('/generate/:symbol', async (req, res) => {
     // Fetch required data (VIX failure shouldn't block signal generation)
     let optionChainData, vixData;
     try {
-      [optionChainData, vixData] = await Promise.all([
-        nseService.getOptionChain(upperSymbol),
-        nseService.getVIX(),
-      ]);
+      optionChainData = await nseService.getOptionChain(upperSymbol);
     } catch (err) {
-      // If option chain fails, we can't generate signal
       return res.status(503).json({
         error: 'Failed to fetch option chain data',
         message: err.message,
       });
+    }
+
+    try {
+      vixData = await nseService.getVIX();
+    } catch (err) {
+      // VIX failure is non-critical — proceed with null
+      vixData = null;
     }
 
     if (!optionChainData || !optionChainData.filtered || !optionChainData.records) {
@@ -51,7 +54,12 @@ router.get('/generate/:symbol', async (req, res) => {
 router.get('/scan', async (req, res) => {
   try {
     const symbols = ['NIFTY', 'BANKNIFTY'];
-    const vixData = await nseService.getVIX();
+    let vixData = null;
+    try {
+      vixData = await nseService.getVIX();
+    } catch (err) {
+      // VIX failure is non-critical for scan
+    }
     const signals = [];
 
     for (const symbol of symbols) {

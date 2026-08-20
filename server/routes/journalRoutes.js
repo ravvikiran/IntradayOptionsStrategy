@@ -6,6 +6,9 @@ const nseService = require('../services/nseService');
 
 const JOURNAL_FILE = path.join(__dirname, '../data/trade-journal.json');
 
+// Simple lock to prevent concurrent file writes
+let writeLock = Promise.resolve();
+
 function getJournal() {
   try {
     if (!fs.existsSync(JOURNAL_FILE)) {
@@ -26,6 +29,26 @@ function saveJournal(entries) {
   const dir = path.dirname(JOURNAL_FILE);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(JOURNAL_FILE, JSON.stringify(entries, null, 2));
+}
+
+/**
+ * Wraps a handler to serialize write operations via a simple lock.
+ */
+function withLock(fn) {
+  return (req, res, next) => {
+    writeLock = writeLock
+      .then(() => fn(req, res, next))
+      .catch(next);
+  };
+}
+
+/**
+ * Sanitize a string field to prevent injection — removes control characters.
+ */
+function sanitize(str, maxLen = 500) {
+  if (typeof str !== 'string') return '';
+  // eslint-disable-next-line no-control-regex
+  return str.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '').slice(0, maxLen);
 }
 
 // GET all trades
@@ -88,38 +111,43 @@ router.get('/stats', (req, res) => {
 });
 
 // POST save new trade
-router.post('/', (req, res) => {
-  if (!req.body.symbol) {
+router.post('/', withLock((req, res) => {
+  if (!req.body.symbol || typeof req.body.symbol !== 'string') {
+    return res.status(400).json({ error: 'symbol is required and must be a string' });
+  }
+
+  const symbol = sanitize(req.body.symbol, 20).toUpperCase();
+  if (!symbol) {
     return res.status(400).json({ error: 'symbol is required' });
   }
 
   const entries = getJournal();
   const trade = {
     id: Date.now().toString(),
-    symbol: req.body.symbol,
-    name: req.body.name || req.body.symbol,
-    sector: req.body.sector || 'Index',
-    exchange: req.body.exchange || 'NSE',
-    market: req.body.market || 'india',
-    scanType: req.body.scanType || 'signal_engine',
+    symbol,
+    name: sanitize(req.body.name || symbol, 50),
+    sector: sanitize(req.body.sector || 'Index', 50),
+    exchange: sanitize(req.body.exchange || 'NSE', 10),
+    market: sanitize(req.body.market || 'india', 20),
+    scanType: sanitize(req.body.scanType || 'signal_engine', 30),
     entryPrice: parseFloat(req.body.entryPrice) || 0,
     entryDate: req.body.entryDate || new Date().toISOString(),
     stopLoss: parseFloat(req.body.stopLoss) || 0,
     target: parseFloat(req.body.target) || 0,
-    riskReward: req.body.riskReward || '',
-    qualityScore: req.body.qualityScore || req.body.totalScore || 0,
-    confidence: req.body.confidence || '',
-    signals: req.body.signals || [],
+    riskReward: sanitize(req.body.riskReward || '', 20),
+    qualityScore: Number(req.body.qualityScore || req.body.totalScore) || 0,
+    confidence: sanitize(req.body.confidence || '', 10),
+    signals: Array.isArray(req.body.signals) ? req.body.signals.map(s => sanitize(String(s), 100)).slice(0, 20) : [],
     status: 'open',
-    direction: req.body.direction || '',
-    strikePrice: req.body.strikePrice || null,
-    strikeType: req.body.strikeType || '',
+    direction: sanitize(req.body.direction || '', 10),
+    strikePrice: req.body.strikePrice ? parseFloat(req.body.strikePrice) : null,
+    strikeType: sanitize(req.body.strikeType || '', 5),
     spotAtEntry: parseFloat(req.body.spotAtEntry) || 0,
     exitPrice: null,
     exitDate: null,
     pnl: null,
     pnlPercent: null,
-    notes: req.body.notes || '',
+    notes: sanitize(req.body.notes || '', 500),
     feedback: null,
     feedbackNote: null,
     createdAt: new Date().toISOString(),
@@ -135,17 +163,17 @@ router.post('/', (req, res) => {
   entries.unshift(trade);
   saveJournal(entries);
   res.status(201).json(trade);
-});
+}));
 
 // POST close trade manually
-router.post('/:id/close', (req, res) => {
+router.post('/:id/close', withLock((req, res) => {
   const entries = getJournal();
   const idx = entries.findIndex(e => e.id === req.params.id);
   if (idx === -1) return res.status(404).json({ error: 'Trade not found' });
 
   const exitPrice = parseFloat(req.body.exitPrice);
-  if (!exitPrice || isNaN(exitPrice)) {
-    return res.status(400).json({ error: 'Valid exitPrice is required' });
+  if (isNaN(exitPrice) || exitPrice <= 0) {
+    return res.status(400).json({ error: 'Valid exitPrice is required (must be > 0)' });
   }
 
   const trade = entries[idx];
@@ -171,14 +199,14 @@ router.post('/:id/close', (req, res) => {
       : 0;
   }
 
-  if (req.body.notes) trade.notes = req.body.notes;
+  if (req.body.notes) trade.notes = sanitize(req.body.notes, 500);
 
   saveJournal(entries);
   res.json(trade);
-});
+}));
 
 // POST check prices - fetch current prices and auto-close if SL/target hit
-router.post('/check-prices', async (req, res) => {
+router.post('/check-prices', withLock(async (req, res) => {
   const entries = getJournal();
   const openTrades = entries.filter(e => e.status === 'open');
 
@@ -213,12 +241,15 @@ router.post('/check-prices', async (req, res) => {
       }
 
       const tradeIdx = entries.findIndex(e => e.id === trade.id);
+      if (tradeIdx === -1) continue;
+
       entries[tradeIdx].currentPrice = currentPrice;
       entries[tradeIdx].lastChecked = new Date().toISOString();
 
       // Calculate unrealized P&L based on spot movement
-      const spotMove = currentPrice - trade.spotAtEntry;
-      const spotMovePercent = trade.spotAtEntry ? ((spotMove / trade.spotAtEntry) * 100) : 0;
+      const spotAtEntry = entries[tradeIdx].spotAtEntry || 0;
+      const spotMove = currentPrice - spotAtEntry;
+      const spotMovePercent = spotAtEntry ? ((spotMove / spotAtEntry) * 100) : 0;
       entries[tradeIdx].unrealizedSpotMove = parseFloat(spotMove.toFixed(2));
       entries[tradeIdx].unrealizedSpotMovePercent = parseFloat(spotMovePercent.toFixed(2));
 
@@ -228,28 +259,28 @@ router.post('/check-prices', async (req, res) => {
           entries[tradeIdx].status = 'target_hit';
           entries[tradeIdx].exitDate = new Date().toISOString();
           entries[tradeIdx].exitPrice = currentPrice;
-          entries[tradeIdx].pnl = parseFloat((currentPrice - trade.spotAtEntry).toFixed(2));
-          entries[tradeIdx].pnlPercent = parseFloat(((currentPrice - trade.spotAtEntry) / trade.spotAtEntry * 100).toFixed(2));
+          entries[tradeIdx].pnl = parseFloat((currentPrice - spotAtEntry).toFixed(2));
+          entries[tradeIdx].pnlPercent = spotAtEntry > 0 ? parseFloat(((currentPrice - spotAtEntry) / spotAtEntry * 100).toFixed(2)) : 0;
         } else if (trade.stopLoss && currentPrice <= trade.stopLoss) {
           entries[tradeIdx].status = 'sl_hit';
           entries[tradeIdx].exitDate = new Date().toISOString();
           entries[tradeIdx].exitPrice = currentPrice;
-          entries[tradeIdx].pnl = parseFloat((currentPrice - trade.spotAtEntry).toFixed(2));
-          entries[tradeIdx].pnlPercent = parseFloat(((currentPrice - trade.spotAtEntry) / trade.spotAtEntry * 100).toFixed(2));
+          entries[tradeIdx].pnl = parseFloat((currentPrice - spotAtEntry).toFixed(2));
+          entries[tradeIdx].pnlPercent = spotAtEntry > 0 ? parseFloat(((currentPrice - spotAtEntry) / spotAtEntry * 100).toFixed(2)) : 0;
         }
       } else if (trade.direction === 'BEARISH') {
         if (trade.target && currentPrice <= trade.target) {
           entries[tradeIdx].status = 'target_hit';
           entries[tradeIdx].exitDate = new Date().toISOString();
           entries[tradeIdx].exitPrice = currentPrice;
-          entries[tradeIdx].pnl = parseFloat((trade.spotAtEntry - currentPrice).toFixed(2));
-          entries[tradeIdx].pnlPercent = parseFloat(((trade.spotAtEntry - currentPrice) / trade.spotAtEntry * 100).toFixed(2));
+          entries[tradeIdx].pnl = parseFloat((spotAtEntry - currentPrice).toFixed(2));
+          entries[tradeIdx].pnlPercent = spotAtEntry > 0 ? parseFloat(((spotAtEntry - currentPrice) / spotAtEntry * 100).toFixed(2)) : 0;
         } else if (trade.stopLoss && currentPrice >= trade.stopLoss) {
           entries[tradeIdx].status = 'sl_hit';
           entries[tradeIdx].exitDate = new Date().toISOString();
           entries[tradeIdx].exitPrice = currentPrice;
-          entries[tradeIdx].pnl = parseFloat((trade.spotAtEntry - currentPrice).toFixed(2));
-          entries[tradeIdx].pnlPercent = parseFloat(((trade.spotAtEntry - currentPrice) / trade.spotAtEntry * 100).toFixed(2));
+          entries[tradeIdx].pnl = parseFloat((spotAtEntry - currentPrice).toFixed(2));
+          entries[tradeIdx].pnlPercent = spotAtEntry > 0 ? parseFloat(((spotAtEntry - currentPrice) / spotAtEntry * 100).toFixed(2)) : 0;
         }
       }
 
@@ -262,10 +293,10 @@ router.post('/check-prices', async (req, res) => {
 
   saveJournal(entries);
   res.json({ checked: results.length, results, timestamp: new Date().toISOString() });
-});
+}));
 
 // POST add feedback
-router.post('/:id/feedback', (req, res) => {
+router.post('/:id/feedback', withLock((req, res) => {
   if (!req.body.feedback) {
     return res.status(400).json({ error: 'feedback field is required' });
   }
@@ -280,37 +311,45 @@ router.post('/:id/feedback', (req, res) => {
   if (idx === -1) return res.status(404).json({ error: 'Trade not found' });
 
   entries[idx].feedback = req.body.feedback;
-  entries[idx].feedbackNote = req.body.feedbackNote || '';
+  entries[idx].feedbackNote = sanitize(req.body.feedbackNote || '', 300);
   entries[idx].feedbackDate = new Date().toISOString();
 
   saveJournal(entries);
   res.json(entries[idx]);
-});
+}));
 
 // PUT update trade (general update)
-router.put('/:id', (req, res) => {
+router.put('/:id', withLock((req, res) => {
   const entries = getJournal();
   const idx = entries.findIndex(e => e.id === req.params.id);
   if (idx === -1) return res.status(404).json({ error: 'Trade not found' });
 
   const allowedFields = ['notes', 'entryPrice', 'stopLoss', 'target', 'feedback', 'feedbackNote', 'status'];
   allowedFields.forEach(field => {
-    if (req.body[field] !== undefined) entries[idx][field] = req.body[field];
+    if (req.body[field] !== undefined) {
+      if (field === 'notes' || field === 'feedbackNote') {
+        entries[idx][field] = sanitize(req.body[field], 500);
+      } else if (field === 'entryPrice' || field === 'stopLoss' || field === 'target') {
+        entries[idx][field] = parseFloat(req.body[field]) || entries[idx][field];
+      } else {
+        entries[idx][field] = req.body[field];
+      }
+    }
   });
   entries[idx].updatedAt = new Date().toISOString();
 
   saveJournal(entries);
   res.json(entries[idx]);
-});
+}));
 
 // DELETE trade
-router.delete('/:id', (req, res) => {
+router.delete('/:id', withLock((req, res) => {
   let entries = getJournal();
   const before = entries.length;
   entries = entries.filter(e => e.id !== req.params.id);
   if (entries.length === before) return res.status(404).json({ error: 'Trade not found' });
   saveJournal(entries);
   res.json({ success: true });
-});
+}));
 
 module.exports = router;

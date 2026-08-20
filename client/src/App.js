@@ -13,9 +13,9 @@ function App() {
     <ErrorBoundary>
       <Router>
         <div className="app">
-          <nav className="navbar">
+          <nav className="navbar" aria-label="Main navigation">
             <div className="nav-brand">
-              <span className="nav-logo">📊</span>
+              <span className="nav-logo" aria-hidden="true">📊</span>
               <span className="nav-title">Options Signal Engine</span>
             </div>
             <div className="nav-links">
