@@ -17,21 +17,33 @@ class ErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{ padding: '2rem', textAlign: 'center', color: '#e1e4e8' }}>
-          <h2>Something went wrong</h2>
-          <p style={{ color: '#8b949e', marginTop: '0.5rem' }}>
-            {this.state.error?.message || 'An unexpected error occurred.'}
+        <div style={{
+          padding: '3rem',
+          textAlign: 'center',
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'var(--bg-primary, #0a0e17)',
+          color: 'var(--text-primary, #f1f5f9)',
+        }}>
+          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚡</div>
+          <h2 style={{ marginBottom: '0.5rem', fontWeight: 700 }}>Something went wrong</h2>
+          <p style={{ color: 'var(--text-secondary, #94a3b8)', marginBottom: '1.5rem', maxWidth: '400px' }}>
+            {this.state.error?.message || 'An unexpected error occurred. Please try reloading the page.'}
           </p>
           <button
             onClick={() => window.location.reload()}
             style={{
-              marginTop: '1rem',
-              padding: '0.6rem 1.2rem',
-              background: '#1c3a5e',
-              border: '1px solid #58a6ff',
-              color: '#58a6ff',
-              borderRadius: '8px',
+              padding: '0.7rem 1.4rem',
+              background: 'var(--color-accent, #3b82f6)',
+              border: 'none',
+              color: 'white',
+              borderRadius: '10px',
               cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: '0.9rem',
             }}
           >
             Reload Page

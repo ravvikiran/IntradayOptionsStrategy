@@ -2,14 +2,47 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Options Signal Engine - Indian Market</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0a0e17" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+  <meta name="description" content="AI-powered intraday options trading signals for NSE indices. Real-time analysis with 7-rule scoring engine." />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="SignalEngine" />
+  
+  <!-- Open Graph -->
+  <meta property="og:title" content="Options Signal Engine - Indian Market" />
+  <meta property="og:description" content="AI-powered intraday options trading signals with real-time NSE analysis" />
+  <meta property="og:type" content="website" />
+
+  <!-- PWA -->
+  <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+  <link rel="icon" href="%PUBLIC_URL%/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="%PUBLIC_URL%/favicon.svg" />
+
+  <!-- Preconnect to font source -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <title>SignalEngine - Options Trading Signals</title>
+
+  <style>
+    /* Critical CSS for initial load */
+    body { margin: 0; background: #0a0e17; color: #f1f5f9; font-family: 'Inter', sans-serif; }
+    #root { min-height: 100vh; }
+    .initial-loader { display: flex; align-items: center; justify-content: center; min-height: 100vh; flex-direction: column; gap: 1rem; }
+    .initial-loader-ring { width: 44px; height: 44px; border-radius: 50%; border: 3px solid #1a2235; border-top-color: #3b82f6; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
 </head>
 <body>
   <noscript>You need to enable JavaScript to run this app.</noscript>
-  <div id="root"></div>
+  <div id="root">
+    <div class="initial-loader" aria-label="Loading application">
+      <div class="initial-loader-ring"></div>
+      <p style="font-size: 0.85rem; opacity: 0.7;">Loading SignalEngine...</p>
+    </div>
+  </div>
 </body>
 </html>

@@ -1,12 +1,15 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { motion } from 'framer-motion';
+import { RefreshCw, Activity, Clock, Zap } from 'lucide-react';
 import axios from 'axios';
 import SignalCard from '../components/SignalCard';
+import { useToast } from '../context/ToastContext';
 
 const SYMBOLS = [
-  { symbol: 'NIFTY', label: 'NIFTY 50' },
-  { symbol: 'BANKNIFTY', label: 'BANK NIFTY' },
-  { symbol: 'FINNIFTY', label: 'FIN NIFTY' },
-  { symbol: 'MIDCPNIFTY', label: 'MIDCAP NIFTY' },
+  { symbol: 'NIFTY', label: 'NIFTY 50', emoji: '📈' },
+  { symbol: 'BANKNIFTY', label: 'BANK NIFTY', emoji: '🏦' },
+  { symbol: 'FINNIFTY', label: 'FIN NIFTY', emoji: '💳' },
+  { symbol: 'MIDCPNIFTY', label: 'MIDCAP NIFTY', emoji: '🔷' },
 ];
 
 function Dashboard() {
@@ -15,69 +18,164 @@ function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
+  const [marketStatus, setMarketStatus] = useState(null);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const intervalRef = useRef(null);
+  const toast = useToast();
 
-  const fetchSignal = useCallback(async (symbol) => {
-    setLoading(true);
+  const fetchSignal = useCallback(async (symbol, silent = false) => {
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const response = await axios.get(`/api/signals/generate/${symbol}`);
       setSignal(response.data);
-      setLastUpdate(new Date().toLocaleTimeString('en-IN'));
+      setLastUpdate(new Date());
+      if (silent) toast.success('Signal refreshed');
     } catch (err) {
-      setError(err.response?.data?.message || err.response?.data?.error || 'Failed to fetch signal. NSE might be down or market is closed.');
+      const msg = err.response?.data?.message || err.response?.data?.error || 'Failed to fetch signal. NSE might be down or market is closed.';
+      setError(msg);
       setSignal(null);
+      if (silent) toast.error('Refresh failed');
     } finally {
       setLoading(false);
+    }
+  }, [toast]);
+
+  const fetchMarketStatus = useCallback(async () => {
+    try {
+      const res = await axios.get('/api/nse/market-status');
+      setMarketStatus(res.data);
+    } catch {
+      // Non-critical
     }
   }, []);
 
   useEffect(() => {
     fetchSignal(selectedSymbol);
-  }, [selectedSymbol, fetchSignal]);
+    fetchMarketStatus();
+  }, [selectedSymbol, fetchSignal, fetchMarketStatus]);
+
+  // Auto-refresh every 60 seconds
+  useEffect(() => {
+    if (autoRefresh) {
+      intervalRef.current = setInterval(() => {
+        fetchSignal(selectedSymbol, true);
+      }, 60000);
+    }
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [autoRefresh, selectedSymbol, fetchSignal]);
+
+  const isMarketOpen = marketStatus?.status === 'open' ||
+    (marketStatus && Array.isArray(marketStatus) && marketStatus.some(m => m.status === 'Open'));
 
   return (
     <div className="dashboard">
-      <div className="dashboard-header">
+      <motion.div
+        className="dashboard-header"
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+      >
         <h1>Signal Dashboard</h1>
-        <p>Select an index to generate options trading signal</p>
-        {lastUpdate && <p style={{fontSize: '0.85rem', color: '#58a6ff', marginTop: '0.5rem'}}>Last updated: {lastUpdate}</p>}
-      </div>
+        <p>Real-time options trading signals powered by 7-rule analysis engine</p>
+        {marketStatus && (
+          <div className={`market-status ${isMarketOpen ? 'open' : 'closed'}`}>
+            <span className="market-status-dot" />
+            <span>{isMarketOpen ? 'Market Open' : 'Market Closed'}</span>
+          </div>
+        )}
+      </motion.div>
 
-      <div className="symbol-selector">
-        {SYMBOLS.map(({ symbol, label }) => (
+      <motion.div
+        className="symbol-selector"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.1 }}
+      >
+        {SYMBOLS.map(({ symbol, label, emoji }) => (
           <button
             key={symbol}
             className={`symbol-btn ${selectedSymbol === symbol ? 'active' : ''}`}
             onClick={() => setSelectedSymbol(symbol)}
+            aria-pressed={selectedSymbol === symbol}
           >
-            {label}
+            <span aria-hidden="true">{emoji}</span> {label}
           </button>
         ))}
-      </div>
+      </motion.div>
 
-      <p style={{fontSize: '0.8rem', color: '#8b949e', marginBottom: '1rem'}}>
-        Score ≥ ±3 triggers a signal. Score ≥ ±5 = HIGH confidence. Nearest weekly expiry analyzed.
-      </p>
-
-      <button
-        className="symbol-btn refresh-btn"
-        onClick={() => fetchSignal(selectedSymbol)}
-        disabled={loading}
-        aria-label="Refresh signal data"
+      <motion.div
+        className="dashboard-actions"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.2 }}
       >
-        🔄 Refresh Signal
-      </button>
+        <button
+          className="btn btn-primary refresh-btn"
+          onClick={() => fetchSignal(selectedSymbol)}
+          disabled={loading}
+          aria-label="Refresh signal data"
+        >
+          <RefreshCw size={16} className={loading ? 'spinning' : ''} />
+          {loading ? 'Analyzing...' : 'Refresh Signal'}
+        </button>
 
-      {loading && (
-        <div className="loading">
+        <label className="auto-refresh-toggle">
+          <input
+            type="checkbox"
+            checked={autoRefresh}
+            onChange={(e) => setAutoRefresh(e.target.checked)}
+          />
+          <span>Auto-refresh (60s)</span>
+        </label>
+
+        {lastUpdate && (
+          <span className="last-update">
+            <Clock size={12} /> Updated {lastUpdate.toLocaleTimeString('en-IN')}
+          </span>
+        )}
+      </motion.div>
+
+      {loading && !signal && (
+        <motion.div
+          className="loading"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+        >
           <div className="loading-spinner"></div>
-          <p>Fetching data from NSE & analyzing...</p>
-        </div>
+          <p>Fetching data from NSE & analyzing 7 rules...</p>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
+            <Activity size={12} /> This may take a few seconds during market hours
+          </p>
+        </motion.div>
       )}
 
-      {error && <div className="error-msg">⚠️ {error}</div>}
+      {error && (
+        <motion.div
+          className="error-msg"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+        >
+          <Zap size={16} /> {error}
+        </motion.div>
+      )}
 
-      {signal && !loading && <SignalCard signal={signal} />}
+      {signal && !loading && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+        >
+          <SignalCard signal={signal} />
+        </motion.div>
+      )}
+
+      {/* Quick info footer */}
+      <div style={{ marginTop: 'var(--space-xl)', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+        <p>Score &ge; &pm;3 triggers a signal. Score &ge; &pm;5 = HIGH confidence. Nearest weekly expiry analyzed.</p>
+      </div>
     </div>
   );
 }

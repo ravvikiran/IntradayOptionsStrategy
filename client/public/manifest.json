@@ -1,0 +1,48 @@
+{
+  "short_name": "SignalEngine",
+  "name": "Options Signal Engine - Indian Market",
+  "description": "AI-powered intraday options trading signals for NSE indices with real-time analysis",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#0f1119",
+  "background_color": "#0f1119",
+  "orientation": "portrait-primary",
+  "categories": ["finance", "productivity"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "url": "/",
+      "description": "View trading signals"
+    },
+    {
+      "name": "Trade Journal",
+      "url": "/journal",
+      "description": "Manage your trades"
+    },
+    {
+      "name": "Analytics",
+      "url": "/analytics",
+      "description": "Performance insights"
+    }
+  ]
+}
