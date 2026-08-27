@@ -67,8 +67,22 @@ function Dashboard() {
     };
   }, [autoRefresh, selectedSymbol, fetchSignal]);
 
-  const isMarketOpen = marketStatus?.status === 'open' ||
-    (marketStatus && Array.isArray(marketStatus) && marketStatus.some(m => m.status === 'Open'));
+  // NSE returns { marketState: [{ market: "Capital Market", marketStatus: "Open", ... }] }
+  const isMarketOpen = (() => {
+    if (!marketStatus) return false;
+    // Check marketState array for Capital Market status
+    if (marketStatus.marketState && Array.isArray(marketStatus.marketState)) {
+      const capitalMarket = marketStatus.marketState.find(m => m.market === 'Capital Market');
+      if (capitalMarket) return capitalMarket.marketStatus === 'Open';
+      // Fallback: check if any market is open
+      return marketStatus.marketState.some(m => m.marketStatus === 'Open');
+    }
+    // Legacy/fallback checks
+    if (Array.isArray(marketStatus)) {
+      return marketStatus.some(m => m.marketStatus === 'Open' || m.status === 'Open');
+    }
+    return marketStatus.status === 'open' || marketStatus.marketStatus === 'Open';
+  })();
 
   return (
     <div className="dashboard">
